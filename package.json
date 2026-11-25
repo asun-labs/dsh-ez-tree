@@ -1,0 +1,80 @@
+{
+  "name": "@asun-labs/dsh-ez-tree",
+  "version": "0.1.0",
+  "description": "EZ-Tree 完整桌面编辑器、Seal 接入、MCP 与内置技能",
+  "type": "module",
+  "license": "MIT",
+  "main": "lib/plugin/index.mjs",
+  "exports": {
+    ".": "./lib/plugin/index.mjs",
+    "./client": "./lib/plugin/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "skills",
+    "releases",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE",
+    "NOTICE",
+    "docs",
+    "licenses",
+    "vendor/ez-tree/LICENSE",
+    "vendor/ez-tree/provenance.json"
+  ],
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/asun-labs/dsh-ez-tree.git"
+  },
+  "homepage": "https://github.com/asun-labs/dsh-ez-tree#readme",
+  "bugs": {
+    "url": "https://github.com/asun-labs/dsh-ez-tree/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test --test-concurrency=1 tests/*.test.mjs",
+    "check": "npm run build && npm test",
+    "desktop:dev": "electron lib/desktop/main.mjs",
+    "desktop:pack": "node scripts/package-desktop.mjs",
+    "verify:desktop": "node scripts/verify-desktop.mjs",
+    "verify:installed": "node scripts/verify-installed.mjs",
+    "pack:release": "node scripts/pack.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-connection"
+      ]
+    }
+  },
+  "peerDependencies": {
+    "react": "^18.3.1"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "electron": "45.5.0",
+    "electron-builder": "26.18.0",
+    "esbuild": "0.28.2",
+    "jsdom": "29.1.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "three": "0.167.1",
+    "tweakpane": "4.0.4",
+    "vite": "6.4.1",
+    "yauzl": "3.4.0",
+    "zod": "3.25.76"
+  }
+}

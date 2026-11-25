@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self'; connect-src 'self' blob:; font-src 'self'; worker-src 'self' blob:">
+  <title>EZ Tree · Seal</title>
+</head>
+<body>
+  <header><strong>EZ Tree</strong><span>程序化树木工作室</span><button id="audio-toggle" type="button">播放环境音</button><button id="about-toggle" type="button">关于</button></header>
+  <main id="root"><div id="app" aria-label="三维树木预览"></div><aside id="ui-container" aria-label="树木参数"></aside></main>
+  <div id="loading-screen" role="status"><img id="logo" src="./logo.png" alt="EZ Tree"><div id="loading-text">正在加载…</div></div>
+  <p id="status" role="status" aria-live="polite"></p>
+  <dialog id="about"><h1>EZ Tree</h1><p>由 Daniel Greenheck 创作的程序化树木生成器。</p><p>Seal 集成包含完整编辑器、MCP 与技能。</p><p>上游：dgreenheck/ez-tree · MIT</p><button id="about-close" type="button">关闭</button></dialog>
+  <input id="fileInput" type="file" accept=".json,application/json" hidden>
+  <a id="downloadLink" hidden></a>
+  <audio id="background-audio" src="./ambience.mp3" loop preload="none"></audio>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
