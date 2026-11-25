@@ -6,6 +6,7 @@ import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve, delimiter } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
+import { releaseFilename } from './pack.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const run = promisify(execFile)
@@ -19,7 +20,8 @@ export async function verifyNativeInstall({ cli, archive, ui = true } = {}) {
   assert.ok(cli, '请通过 --cli 提供已安装官方 DSH CLI 的 lib/bin.js。')
   const absoluteCli = resolve(cli)
   const manifest = JSON.parse(await readFile(join(root, 'package.json')))
-  const artifact = archive ? resolve(archive) : join(root, 'dist', `asun-labs-dsh-ez-tree-${manifest.version}.tgz`)
+  assert.equal(manifest.name, 'dsh-ez-tree', '原生安装验收必须使用正式 canonical 包名。')
+  const artifact = archive ? resolve(archive) : join(root, 'dist', releaseFilename(manifest))
   const bytes = await readFile(artifact)
   const base = join(root, '.build/native-install')
   await mkdir(base, { recursive: true })
@@ -43,7 +45,8 @@ export async function verifyNativeInstall({ cli, archive, ui = true } = {}) {
   assert.equal(installed.version, manifest.version)
   assert.equal(installed.scripts, undefined, '发行包不应依赖安装时构建。')
   const composed = await invoke(['--profile', 'web', '--dump-config'])
-  assert.match(composed, /@asun-labs\/dsh-ez-tree/)
+  assert.ok(composed.includes(manifest.name), '组合配置未包含正式插件身份。')
+  assert.ok(!composed.includes('@asun-labs/dsh-ez-tree'), '新安装不应激活旧 scoped 包。')
   await writeFile(join(output, 'composed-profile.yml'), composed)
   const client = await readFile(join(installedRoot, installed.exports['./client']), 'utf8')
   assert.ok(client.includes(`id: "${manifest.name}"`), '客户端 Loader ID 与插件 npm 身份不一致。')

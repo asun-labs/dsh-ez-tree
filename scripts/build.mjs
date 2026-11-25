@@ -31,7 +31,8 @@ export async function buildAll() {
   const mcp = await build({ ...common, metafile: true, entryPoints: ['mcp/cli.mjs'], outfile: resolve(root, 'lib/mcp/cli.mjs') })
   await licenses(mcp.metafile.inputs, resolve(root, 'lib/mcp/licenses'))
   const plugin = await build({ ...common, metafile: true, entryPoints: ['plugin/index.mjs'], outfile: resolve(root, 'lib/plugin/index.mjs') })
-  await licenses(plugin.metafile.inputs, resolve(root, 'lib/plugin/licenses'))
+  const upgrade = await build({ ...common, metafile: true, entryPoints: ['plugin/upgrade-profile.mjs'], outfile: resolve(root, 'lib/upgrade-profile.mjs') })
+  await licenses({ ...plugin.metafile.inputs, ...upgrade.metafile.inputs }, resolve(root, 'lib/plugin/licenses'))
   const manifest = JSON.parse(await readFile(resolve(root, 'package.json')))
   const client = { absWorkingDir: root, bundle: true, format: 'cjs', platform: 'browser', target: 'es2022', external: ['react', 'react/*'],
     define: { 'process.env.NODE_ENV': '"production"' }, sourcemap: true }

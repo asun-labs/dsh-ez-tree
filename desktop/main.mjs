@@ -9,7 +9,8 @@ import { optionsSchema, validateComplexity } from '../mcp/options.mjs'
 import { existsSync, mkdirSync } from 'node:fs'
 import { serveRenderer } from '../mcp/pipe.mjs'
 
-export const VERSION = '0.1.0'
+import { VERSION } from '../version.mjs'
+export { VERSION }
 
 function argumentsFrom(argv) {
   const options = { hidden: false }

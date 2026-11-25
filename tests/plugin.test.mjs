@@ -8,6 +8,7 @@ import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { JSDOM } from 'jsdom'
 import { Readable } from 'node:stream'
+import { VERSION } from '../version.mjs'
 
 const owner = { principal: { kind: 'owner' } }
 
@@ -17,7 +18,7 @@ function fixture({ authenticated = true, native = false, blockInstall = false } 
   const managers = []
   class Manager {
     constructor(options) { this.options = options; this.installed = false; this.running = false; this.stops = 0; managers.push(this) }
-    async status() { return { installed: this.installed, running: this.running, version: '0.1.0', available: true, supported: true, dataDirectory: '/data' } }
+    async status() { return { installed: this.installed, running: this.running, version: VERSION, targetVersion: VERSION, updateAvailable: false, available: true, supported: true, dataDirectory: '/data' } }
     async install() {
       if (blockInstall) await new Promise((resolve, reject) => this.options.signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true }))
       this.options.signal.throwIfAborted(); this.installed = true
@@ -25,7 +26,7 @@ function fixture({ authenticated = true, native = false, blockInstall = false } 
     async launch() { this.options.signal.throwIfAborted(); this.running = true }
     async stop() { this.stops++; this.running = false }
     async uninstall() { this.installed = false }
-    async descriptor() { return { command: '/app/ez-tree.exe', args: ['/app/resources/app/lib/mcp/cli.mjs', '--account', this.options.accountId], env: { ELECTRON_RUN_AS_NODE: '1' }, cwd: '/data', version: '0.1.0' } }
+    async descriptor() { return { command: '/app/ez-tree.exe', args: ['/app/resources/app/lib/mcp/cli.mjs', '--account', this.options.accountId], env: { ELECTRON_RUN_AS_NODE: '1' }, cwd: '/data', version: VERSION } }
   }
   const connectorCalls = []
   const records = []
@@ -265,7 +266,7 @@ test('mounted client clears old-account MCP configuration and never overlaps slo
   let delayStatus = false
   let releaseStatus
   let statusCalls = 0
-  const status = () => ({ accountScope: scope, installed: true, running: false, supported: true, available: true, version: '0.1.0' })
+  const status = () => ({ accountScope: scope, installed: true, running: false, supported: true, available: true, version: '0.1.0', targetVersion: VERSION, updateAvailable: true })
   const api = async action => {
     if (action === 'prepareMcp') return { accountScope: scope, config: { command: '/app/ez-tree.exe', args: ['--account', scope] }, message: 'MCP prepared' }
     assert.equal(action, 'status')
@@ -278,6 +279,11 @@ test('mounted client clears old-account MCP configuration and never overlaps slo
   const root = createRoot(container)
   try {
     await act(async () => { root.render(React.createElement(EzTreePanel, { api })) })
+    const upgrade = [...container.querySelectorAll('button')].find(button => button.textContent === `升级到 ${VERSION}`)
+    assert.ok(upgrade, 'verified old installation must expose its available upgrade')
+    assert.equal(upgrade.disabled, false)
+    assert.match(container.textContent, /已安装 0\.1\.0/)
+    assert.equal(container.textContent.includes('尚未安装'), false)
     const prepare = [...container.querySelectorAll('button')].find(button => button.textContent === '准备 MCP')
     await act(async () => { prepare.click() })
     assert.match(container.querySelector('pre').textContent, /account-a/)

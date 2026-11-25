@@ -8,15 +8,16 @@ import { readFile, rename, rm, lstat, realpath } from 'node:fs/promises'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { safeDirectory, hashFile, extractVerified, validateInstalled, safeEntry } from './archive.mjs'
+import { VERSION } from '../version.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 export const packageRoot = resolve(here, existsSync(join(here, '../package.json')) ? '..' : '../..')
 const processes = new Map()
 const installations = new Map()
-const VERSION = '0.1.0'
+const LEGACY_VERSIONS = ['0.1.0']
 
 export class RuntimeManager {
-  constructor({ home = process.env.DSH_HOME || join(homedir(), '.seal-harness'), accountId, signal, onLog = () => {}, manifest, fetchImpl = fetch, renameImpl = rename, spawnImpl = spawn } = {}) {
+  constructor({ home = process.env.DSH_HOME || join(homedir(), '.seal-harness'), accountId, signal, onLog = () => {}, manifest, legacyManifests, fetchImpl = fetch, renameImpl = rename, spawnImpl = spawn } = {}) {
     if (typeof accountId !== 'string' || !accountId.trim()) throw new Error('缺少当前账号。')
     this.home = resolve(home)
     this.accountId = accountId
@@ -26,33 +27,53 @@ export class RuntimeManager {
     this.signal = signal
     this.onLog = onLog
     this.manifest = manifest
+    this.legacyManifests = legacyManifests
     this.fetch = fetchImpl
     this.rename = renameImpl
     this.spawn = spawnImpl
   }
-  async release() {
-    const manifest = this.manifest ?? JSON.parse(await readFile(join(packageRoot, 'releases/runtime.json'), 'utf8'))
-    if (manifest.version !== VERSION || manifest.appId !== 'com.asun-labs.ez-tree') throw new Error('应用发布清单版本无效。')
+  runtimeDirectory(version) {
+    if (version !== VERSION && !LEGACY_VERSIONS.includes(version)) throw new Error('未知的受管理应用版本。')
+    return join(this.dataDirectory, 'runtime', version, `${process.platform}-${process.arch}`)
+  }
+  async release(version = VERSION) {
+    this.runtimeDirectory(version)
+    const manifest = (version === VERSION ? this.manifest : this.legacyManifests?.[version])
+      ?? JSON.parse(await readFile(join(packageRoot, version === VERSION ? 'releases/runtime.json' : `releases/legacy/${version}.json`), 'utf8'))
+    if (manifest.version !== version || manifest.appId !== 'com.asun-labs.ez-tree') throw new Error('应用发布清单版本无效。')
     const release = manifest.platforms[`${process.platform}-${process.arch}`]
     if (!release) return null
-    const asset = `dsh-ez-tree-${VERSION}-${process.platform}-${process.arch}.zip`
-    if (release.url !== `https://github.com/asun-labs/dsh-ez-tree/releases/download/v${VERSION}/${asset}` || !/^[a-f0-9]{64}$/.test(release.sha256) || !Number.isSafeInteger(release.bytes) || release.bytes < 1 || release.bytes > 1024 ** 3 || !Array.isArray(release.files)) throw new Error('应用发布清单无效。')
+    const asset = `dsh-ez-tree-${version}-${process.platform}-${process.arch}.zip`
+    if (release.url !== `https://github.com/asun-labs/dsh-ez-tree/releases/download/v${version}/${asset}` || !/^[a-f0-9]{64}$/.test(release.sha256) || !Number.isSafeInteger(release.bytes) || release.bytes < 1 || release.bytes > 1024 ** 3 || !Array.isArray(release.files)) throw new Error('应用发布清单无效。')
     safeEntry(release.executable)
     if (!release.mcp || release.mcp.env?.ELECTRON_RUN_AS_NODE !== '1' || Object.keys(release.mcp.env).length !== 1) throw new Error('MCP 启动清单无效。')
     safeEntry(release.mcp.entry)
     if (!release.files.some(file => file.path === release.mcp.entry)) throw new Error('MCP 入口未列入文件校验清单。')
     return release
   }
+  async selectedRuntime(targetRelease) {
+    const errors = []
+    for (const version of [VERSION, ...LEGACY_VERSIONS]) {
+      const directory = this.runtimeDirectory(version)
+      if (!existsSync(directory)) continue
+      const release = version === VERSION ? targetRelease : await this.release(version)
+      if (!release) continue
+      try {
+        const manifest = await validateInstalled(directory, release)
+        if (manifest.version !== version || manifest.name !== 'dsh-ez-tree-desktop') throw new Error('应用身份不匹配。')
+        return { runtime: { version, directory, release }, error: errors.join('；') || undefined }
+      } catch (error) { errors.push(`${version}：${error.message}`) }
+    }
+    return { runtime: null, error: errors.join('；') || undefined }
+  }
   async status() {
     const release = await this.release()
-    const status = { supported: Boolean(release), available: Boolean(release), installed: false, version: VERSION, running: Boolean(processes.get(this.dataDirectory)), dataDirectory: this.dataDirectory }
-    if (!release || !existsSync(this.installDirectory)) return status
-    try {
-      const manifest = await validateInstalled(this.installDirectory, release)
-      if (manifest.version !== VERSION || manifest.name !== 'dsh-ez-tree-desktop') throw new Error('应用身份不匹配。')
-      status.installed = true
-    } catch (error) { status.error = error.message }
-    return status
+    const selected = await this.selectedRuntime(release)
+    return { supported: Boolean(release || selected.runtime), available: Boolean(release), installed: Boolean(selected.runtime),
+      version: selected.runtime?.version ?? VERSION, targetVersion: VERSION,
+      updateAvailable: Boolean(release && selected.runtime && selected.runtime.version !== VERSION),
+      running: Boolean(processes.get(this.dataDirectory)), dataDirectory: this.dataDirectory,
+      ...(selected.error ? { error: selected.error } : {}) }
   }
   async install() {
     const current = installations.get(this.installDirectory)
@@ -66,8 +87,9 @@ export class RuntimeManager {
     this.signal?.throwIfAborted()
     const release = await this.release()
     if (!release) throw new Error('当前平台尚无已验证的 EZ-Tree 桌面发布包。')
-    if ((await this.status()).installed) return
-    if ([...processes.values()].some(record => record.installDirectory === this.installDirectory)) throw new Error('请先关闭正在运行的 EZ-Tree 再重新安装。')
+    const status = await this.status()
+    if (status.installed && status.version === VERSION) return
+    if (processes.has(this.dataDirectory)) throw new Error('请先关闭正在运行的 EZ-Tree 再升级或重新安装。')
     const parent = dirname(this.installDirectory)
     await safeDirectory(parent)
     const stage = join(parent, `.staging-${randomUUID()}`)
@@ -108,28 +130,31 @@ export class RuntimeManager {
     }
   }
   async descriptor() {
-    const status = await this.status()
+    const selected = await this.selectedRuntime(await this.release())
     this.signal?.throwIfAborted()
-    if (!status.installed) throw new Error(status.error || '请先安装 EZ-Tree 桌面应用。')
+    if (!selected.runtime) throw new Error(selected.error || '请先安装 EZ-Tree 桌面应用。')
     await safeDirectory(this.dataDirectory)
-    const release = await this.release()
-    return { command: join(this.installDirectory, release.executable), args: [join(this.installDirectory, release.mcp.entry), '--account', this.accountId],
-      env: { ...release.mcp.env, DSH_HOME: this.home }, cwd: this.dataDirectory, version: VERSION }
+    const { version, directory, release } = selected.runtime
+    return { command: join(directory, release.executable), args: [join(directory, release.mcp.entry), '--account', this.accountId],
+      env: { ...release.mcp.env, DSH_HOME: this.home }, cwd: this.dataDirectory, version }
   }
   async launch() {
     this.signal?.throwIfAborted()
     if (processes.has(this.dataDirectory)) return this.status()
+    if (installations.has(this.installDirectory)) throw new Error('应用正在安装，请稍后重试。')
     const descriptor = await this.descriptor()
     this.signal?.throwIfAborted()
-    const release = await this.release()
-    const command = join(this.installDirectory, release.executable)
+    if (installations.has(this.installDirectory)) throw new Error('应用正在安装，请稍后重试。')
+    const release = await this.release(descriptor.version)
+    const directory = this.runtimeDirectory(descriptor.version)
+    const command = join(directory, release.executable)
     const ready = join(this.dataDirectory, 'ready.json')
     await rm(ready, { force: true })
     this.signal?.throwIfAborted()
     const environment = { ...process.env, DSH_HOME: this.home }
     delete environment.ELECTRON_RUN_AS_NODE
     const child = this.spawn(command, ['--account', this.accountId, '--ready-file', ready], { cwd: descriptor.cwd, env: environment, stdio: 'ignore', windowsHide: true })
-    const record = { child, installDirectory: this.installDirectory }
+    const record = { child, installDirectory: directory, version: descriptor.version }
     processes.set(this.dataDirectory, record)
     let failure
     child.once('error', error => { failure = error; if (processes.get(this.dataDirectory) === record) processes.delete(this.dataDirectory) })
@@ -148,7 +173,7 @@ export class RuntimeManager {
       const marker = JSON.parse(await readFile(ready, 'utf8'))
       const executable = await realpath(command)
       const runningExecutable = typeof marker.executable === 'string' ? await realpath(marker.executable) : ''
-      if (marker.version !== VERSION || marker.pid !== child.pid || runningExecutable.toLowerCase() !== executable.toLowerCase()) throw new Error('运行中的应用身份不匹配。')
+      if (marker.version !== descriptor.version || marker.pid !== child.pid || runningExecutable.toLowerCase() !== executable.toLowerCase()) throw new Error('运行中的应用身份不匹配。')
       return this.status()
     } catch (error) { child.kill(); throw error }
     finally { this.signal?.removeEventListener('abort', abort) }
@@ -164,12 +189,14 @@ export class RuntimeManager {
   }
   async uninstall() {
     this.signal?.throwIfAborted()
-    if ([...processes.values()].some(record => record.installDirectory === this.installDirectory)) throw new Error('请先关闭 EZ-Tree 再卸载。')
+    if (processes.has(this.dataDirectory)) throw new Error('请先关闭 EZ-Tree 再卸载。')
     if (installations.has(this.installDirectory)) throw new Error('应用正在安装，请稍后重试。')
-    if (existsSync(this.installDirectory)) {
-      await safeDirectory(dirname(this.installDirectory))
-      if ((await lstat(this.installDirectory)).isSymbolicLink()) throw new Error('应用目录不能是链接。')
-      await rm(this.installDirectory, { recursive: true })
+    for (const version of [VERSION, ...LEGACY_VERSIONS]) {
+      const directory = this.runtimeDirectory(version)
+      if (!existsSync(directory) || !await this.release(version)) continue
+      await safeDirectory(dirname(directory))
+      if ((await lstat(directory)).isSymbolicLink()) throw new Error('应用目录不能是链接。')
+      await rm(directory, { recursive: true })
     }
     return this.status()
   }

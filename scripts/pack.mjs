@@ -8,7 +8,7 @@ import { promisify } from 'node:util'
 import { fileURLToPath } from 'node:url'
 import { buildAll, root } from './build.mjs'
 
-const runtimePaths = ['lib/plugin', 'skills', 'releases', 'docs', 'licenses', 'cordis.patch.yml', 'README.md', 'LICENSE', 'NOTICE', 'vendor/ez-tree/LICENSE', 'vendor/ez-tree/provenance.json']
+const runtimePaths = ['lib/plugin', 'lib/upgrade-profile.mjs', 'lib/upgrade-profile.mjs.map', 'skills', 'releases', 'docs', 'licenses', 'cordis.patch.yml', 'README.md', 'LICENSE', 'NOTICE', 'vendor/ez-tree/LICENSE', 'vendor/ez-tree/provenance.json']
 export function releaseManifest(manifest) {
   const { scripts, devDependencies, dependencies, ...runtime } = manifest
   return { ...runtime, files: runtimePaths, peerDependenciesMeta: { react: { optional: true } } }

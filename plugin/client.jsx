@@ -64,12 +64,14 @@ export function EzTreePanel({ api }) {
   }
   const waiting = !!busy || !!state?.busy
   const canInstall = !!state && state.supported !== false && state.available !== false
+  const installLabel = state?.updateAvailable ? `升级到 ${state.targetVersion}` : '安装桌面应用'
   return <main className="ez-tree-panel" data-plugin="dsh-ez-tree">
     <h1>树木生成器</h1>
     <p className="ez-tree-muted">完整 EZ-Tree 编辑器：实时三维预览、树种预设、枝叶参数、环境调节，以及 GLB、PNG 和参数 JSON 导入导出。</p>
     <section className="ez-tree-card" aria-label="桌面应用">
       <h2 className="ez-tree-status"><TreeIcon size={28} /> EZ-Tree</h2>
       <dl><dt>安装状态</dt><dd>{!state ? '正在读取…' : state.installed ? `已安装 ${state.version ?? ''}` : '尚未安装'}</dd>
+        {state?.updateAvailable && <><dt>可用更新</dt><dd>{state.targetVersion}（当前版本可继续使用）</dd></>}
         <dt>运行状态</dt><dd>{waiting ? `${labels[busy || state?.busy] ?? '处理'}中…` : state?.running ? '编辑器运行中' : '未运行'}</dd>
         {state?.dataDirectory && <><dt>数据目录</dt><dd>{state.dataDirectory}</dd></>}
         {state?.identityMode === 'local' && <><dt>账号范围</dt><dd>本机 DSH 所有者</dd></>}
@@ -77,11 +79,12 @@ export function EzTreePanel({ api }) {
       <p className="ez-tree-muted">安装会下载此插件固定版本的独立桌面程序和资源，无需另外安装 Node.js。项目与导出文件保存在数据目录，卸载应用保留数据。</p>
       {state?.supported === false && <p role="status">当前平台尚无已验证的桌面发行包。</p>}
       <div className="ez-tree-actions">
-        <button disabled={waiting || !canInstall || state?.installed} onClick={() => act('install')}>安装桌面应用</button>
+        <button disabled={waiting || !canInstall || (state?.installed && !state?.updateAvailable) || state?.running} onClick={() => act('install')}>{installLabel}</button>
         <button disabled={waiting || !state?.installed} onClick={() => act('open')}>打开编辑器</button>
         <button disabled={waiting || !state?.running} onClick={() => act('close')}>关闭编辑器</button>
         <button disabled={waiting || !state?.installed} onClick={() => setConfirmUninstall(true)}>卸载应用</button>
       </div>
+      {state?.updateAvailable && <p className="ez-tree-muted">升级前请关闭编辑器。升级保留项目、导出和旧版程序，已有 MCP 配置可继续使用；重新准备 MCP 后使用新版。</p>}
       {confirmUninstall && <div role="group" aria-label="确认卸载"><p>卸载 EZ-Tree 程序并保留项目和导出文件？请先保存编辑器中的更改。</p><div className="ez-tree-actions"><button disabled={waiting} onClick={() => act('uninstall')}>确认卸载，保留数据</button><button disabled={waiting} onClick={() => setConfirmUninstall(false)}>取消</button></div></div>}
     </section>
     <section className="ez-tree-card" aria-label="智能体集成"><h2>在会话中使用</h2>

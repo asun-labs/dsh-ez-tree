@@ -1,11 +1,11 @@
 {
   "appId": "com.asun-labs.ez-tree",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "platforms": {
     "win32-x64": {
-      "url": "https://github.com/asun-labs/dsh-ez-tree/releases/download/v0.1.0/dsh-ez-tree-0.1.0-win32-x64.zip",
-      "sha256": "22bd1c09ef7a627945ef7d2e341e5b110dc80970472aaa0a09b6c83b2fbd3327",
-      "bytes": 170936918,
+      "url": "https://github.com/asun-labs/dsh-ez-tree/releases/download/v0.1.1/dsh-ez-tree-0.1.1-win32-x64.zip",
+      "sha256": "0e3c239cd744ad69d72240299d45a7e84e079ce7aa288e66f148662bfba8bd17",
+      "bytes": 170937101,
       "executable": "EZ-Tree.exe",
       "mcp": {
         "entry": "resources/app/lib/mcp/cli.mjs",
@@ -42,7 +42,7 @@
         {
           "path": "EZ-Tree.exe",
           "bytes": 250460672,
-          "sha256": "48dfafd8e97d6b28920ea180a0cba80dc01dae1db7b2bfcebeda85b68f71762c"
+          "sha256": "892aa55acf91394d3fb1ba540c7702ca1644164c8df24ab2acae1053a2c871ad"
         },
         {
           "path": "ffmpeg.dll",
@@ -386,13 +386,13 @@
         },
         {
           "path": "resources/app/lib/desktop/main.mjs",
-          "bytes": 165818,
-          "sha256": "aade6cf6b88b5918dff41733c2fd7f01cbc54d766a0ad9d8523f119e0b6c9b6d"
+          "bytes": 165834,
+          "sha256": "2653a0d94092c80a49ae8a9a60d21785096cd8a91a4317d61392752d03089ee5"
         },
         {
           "path": "resources/app/lib/desktop/main.mjs.map",
-          "bytes": 293180,
-          "sha256": "14d2009ec9d9725c6c051538bfca3027ecb4cac048a307a9c5643087635bee3f"
+          "bytes": 293412,
+          "sha256": "9a9547ad266349883a7a7868a9aa5579c9dbf39ca59d16122c6bf78c353c5937"
         },
         {
           "path": "resources/app/lib/editor/ambience.mp3",
@@ -666,13 +666,13 @@
         },
         {
           "path": "resources/app/lib/mcp/cli.mjs",
-          "bytes": 766120,
-          "sha256": "c565ef89952d9378ff667f9aecac4e70df9bc8061d983790054835f4b36ddb54"
+          "bytes": 766136,
+          "sha256": "e80f8367540045588ae1c58025a9f620d229ddadbfe8b0b1be05e2d3048d23a2"
         },
         {
           "path": "resources/app/lib/mcp/cli.mjs.map",
-          "bytes": 1258877,
-          "sha256": "37fec57facb57cdcda18129f30c1fffdf46ad6cecdf269520ea907f24e2641c1"
+          "bytes": 1259096,
+          "sha256": "2547fa868cfcbc19e72d97b1c6a89d68fde3e38810c23e4115328579f2e822ea"
         },
         {
           "path": "resources/app/lib/mcp/licenses/@modelcontextprotocol-sdk-LICENSE",
@@ -737,7 +737,7 @@
         {
           "path": "resources/app/package.json",
           "bytes": 270,
-          "sha256": "e6c5d2be49892e4a8ae9ee22dee58021c91bae16933d026e302797cd539cc7e0"
+          "sha256": "0664bc5ec9e504ad843507f836704e1e2ddb6db5bc79fe6c4f785e165195f4c7"
         },
         {
           "path": "resources/app/provenance.json",

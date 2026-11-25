@@ -94,7 +94,29 @@ def main():
         raise RuntimeError("Installed verification does not match current archive")
     if not all(verification.get(key) for key in ["install", "realDesktop", "reopen", "close", "uninstall", "dataPreserved"]):
         raise RuntimeError("Installed lifecycle verification is incomplete")
-    files = sorted(path for path in (ROOT / "dist").iterdir() if path.is_file() and not path.name.endswith('.zip.validation.json') and (path.suffix in [".zip", ".tgz", ".json", ".sha256", ".md"] or path.name == "SHA256SUMS"))
+    if not verification.get('legacyUpgradeVerified') or not verification.get('oldMcpPathPreserved'):
+        raise RuntimeError('Legacy desktop upgrade verification is incomplete')
+    package_filename = package['name'].lstrip('@').replace('/', '-') + '-' + version + '.tgz'
+    migration = json.loads((ROOT / '.build/profile-upgrade-verification.json').read_text(encoding='utf-8'))
+    artifact_hash = hashlib.file_digest((ROOT / 'dist' / package_filename).open('rb'), 'sha256').hexdigest()
+    if migration.get('package') != package['name'] + '@' + version or migration.get('sha256') != artifact_hash:
+        raise RuntimeError('Profile migration was not verified against this exact plugin archive')
+    for key in ['desktop', 'web']:
+        result = migration['steps'][key]
+        if result.get('migration') != 'passed' or not result.get('physicalLegacyRemoved') or not result.get('idempotent'):
+            raise RuntimeError('Profile migration verification incomplete: ' + key)
+    if not migration['steps']['canonicalHostClient'].get('passed'):
+        raise RuntimeError('Upgraded Host/Client verification incomplete')
+    asset_names = {package_filename, package_filename + '.json', package_filename + '.sha256',
+                   'runtime.json', 'validation.json', 'RELEASE-NOTES.md', 'SHA256SUMS'}
+    for record in manifest['platforms'].values():
+        filename = record['url'].rsplit('/', 1)[-1]
+        if not filename.startswith('dsh-ez-tree-' + version + '-'):
+            raise RuntimeError('Desktop artifact belongs to another release')
+        asset_names.update([filename, filename + '.sha256'])
+    files = [ROOT / 'dist' / name for name in sorted(asset_names)]
+    if any(not path.is_file() for path in files):
+        raise RuntimeError('Missing an exact current-version release attachment')
     if not any(path.suffix == ".tgz" for path in files) or not any(path.suffix == ".zip" for path in files):
         raise RuntimeError("Missing plugin or desktop package")
     for platform, record in manifest["platforms"].items():

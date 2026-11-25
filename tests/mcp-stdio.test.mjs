@@ -8,6 +8,7 @@ import { spawn } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
+import { VERSION } from '../version.mjs'
 
 const executable = process.env.EZ_TREE_EXECUTABLE
 const appEntry = process.env.EZ_TREE_APP_ENTRY
@@ -27,7 +28,7 @@ test('packaged application serves actual MCP stdio and exports a textured tree',
   let diagnostics = ''
   let phase = 'connect'
   transport.stderr?.on('data', bytes => { diagnostics += bytes.toString() })
-  const client = new Client({ name: 'dsh-ez-tree-verifier', version: '0.1.0' })
+  const client = new Client({ name: 'dsh-ez-tree-verifier', version: VERSION })
   client.onerror = error => { diagnostics += `\nMCP client error: ${error.stack ?? error.message}\n` }
   const value = async (name, args = {}) => {
     phase = name
@@ -86,7 +87,7 @@ test('full hidden GUI and MCP can use one account concurrently', { skip: !enable
     args: [mcpEntry, ...(appEntry ? ['--app-entry', appEntry] : []), '--account', 'concurrent-test'],
     env: { ...environment, ELECTRON_RUN_AS_NODE: '1' }, stderr: 'pipe' })
   transport.stderr?.on('data', bytes => { diagnostics += bytes.toString() })
-  const client = new Client({ name: 'dsh-ez-tree-concurrency', version: '0.1.0' })
+  const client = new Client({ name: 'dsh-ez-tree-concurrency', version: VERSION })
   try {
     const deadline = Date.now() + 90_000
     while (!existsSync(readyFile)) {

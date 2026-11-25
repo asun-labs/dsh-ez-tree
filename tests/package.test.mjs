@@ -15,12 +15,14 @@ test('release manifest contains only precompiled runtime payload', () => {
   assert.ok(!manifest.files.includes('lib/editor'))
   assert.ok(manifest.files.includes('docs'))
   assert.ok(manifest.files.includes('licenses'))
+  assert.ok(manifest.files.includes('lib/upgrade-profile.mjs'))
   assert.equal(manifest.peerDependenciesMeta.react.optional, true)
 })
 
 test('scoped package archive names do not depend on npm8 JSON filename', () => {
   assert.equal(releaseFilename({ name: '@asun-labs/dsh-ez-tree', version: '0.1.0' }), 'asun-labs-dsh-ez-tree-0.1.0.tgz')
   assert.equal(releaseFilename({ name: 'dsh-ez-tree', version: '0.1.1-rc.1' }), 'dsh-ez-tree-0.1.1-rc.1.tgz')
+  assert.equal(releaseFilename({ name: 'dsh-ez-tree', version: '0.1.1' }), 'dsh-ez-tree-0.1.1.tgz')
   assert.throws(() => releaseFilename({ name: '../outside', version: '0.1.0' }))
   assert.throws(() => releaseFilename({ name: 'valid', version: '../bad' }))
 })

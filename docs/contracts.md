@@ -4,6 +4,8 @@
 
 修改独立应用、Seal 接入、MCP、技能、安装器或发行物时遵守本契约。业务由独立应用拥有；插件只负责接入。上游 vendor 原字节与来源哈希保持一致，适配写在 app/。
 
+0.1.1 起包名统一为 `dsh-ez-tree`，历史包名 `@asun-labs/dsh-ez-tree` 只用于迁移识别。Loader 必须注册当前 package.name；Cordis entry `dsh-ez-tree`、应用 ID、账号目录、RPC、MCP 工具/连接器 ID 和技能名均保持稳定。旧 profile 迁移、回滚及幂等契约见 [upgrade.md](upgrade.md)。
+
 ## 2. 接口
 
 - Host Connection RPC `/dsh-ez-tree`，action 为 `status/install/open/close/uninstall/prepareMcp/installSkill`，payload 固定空对象，只允许 owner principal。

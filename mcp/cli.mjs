@@ -4,7 +4,7 @@ import { dataDirectory } from '../desktop/paths.mjs'
 import { createMcpServer } from './server.mjs'
 import { openRenderer } from './pipe.mjs'
 
-const VERSION = '0.1.0'
+import { VERSION } from '../version.mjs'
 
 async function main() {
   const options = {}

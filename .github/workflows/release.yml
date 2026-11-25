@@ -9,7 +9,7 @@ on:
         type: boolean
         default: false
       release_tag:
-        description: '需要发布的现有版本标签，如 v0.1.0'
+        description: '需要发布的现有版本标签，如 v0.1.1'
         type: string
         default: ''
 permissions:
@@ -98,11 +98,28 @@ jobs:
         shell: bash
         run: |
           cp releases/runtime.json dist/runtime.json
-          cd dist
-          sha256sum *.zip *.tgz runtime.json > SHA256SUMS
-          printf '%s\n' '完整独立编辑器、Seal 插件、MCP 与技能。' 'Windows 与 Linux 已在本次 CI 中验证真实打包实例。macOS 完成独立应用验证，Seal 安装适配尚未发布。' > RELEASE-NOTES.md
+          node --input-type=module <<'JS'
+          import {readFile,writeFile} from 'node:fs/promises';
+          import {createHash} from 'node:crypto';
+          import {releaseFilename} from './scripts/pack.mjs';
+          const pkg=JSON.parse(await readFile('package.json'));
+          const runtime=JSON.parse(await readFile('releases/runtime.json'));
+          if(runtime.version!==pkg.version)throw Error('发布清单版本不一致');
+          const assets=[...Object.keys(runtime.platforms).map(platform=>`dsh-ez-tree-${pkg.version}-${platform}.zip`),releaseFilename(pkg),'runtime.json'];
+          const sums=[];
+          for(const asset of assets){const bytes=await readFile('dist/'+asset);sums.push(createHash('sha256').update(bytes).digest('hex')+'  '+asset);}
+          await writeFile('dist/SHA256SUMS',sums.join('\n')+'\n');
+          await writeFile('dist/release-assets.json',JSON.stringify([...assets,'SHA256SUMS']));
+          await writeFile('dist/RELEASE-NOTES.md',`完整独立编辑器、Seal 插件、MCP 与技能。\n本次 CI 已验证平台：${Object.keys(runtime.platforms).join('、')}。未列出平台不包含可安装发布包。\n`);
+          JS
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.release_tag }}
-        run: gh release create "$RELEASE_TAG" dist/*.zip dist/*.tgz dist/runtime.json dist/SHA256SUMS --title "EZ Tree $RELEASE_TAG" --notes-file dist/RELEASE-NOTES.md
+        run: |
+          node --input-type=module <<'JS'
+          import {readFile} from 'node:fs/promises';
+          import {execFileSync} from 'node:child_process';
+          const assets=JSON.parse(await readFile('dist/release-assets.json'));
+          execFileSync('gh',['release','create',process.env.RELEASE_TAG,...assets.map(name=>'dist/'+name),'--title','EZ Tree '+process.env.RELEASE_TAG,'--notes-file','dist/RELEASE-NOTES.md'],{stdio:'inherit'});
+          JS
