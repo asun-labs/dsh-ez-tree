@@ -1,0 +1,14 @@
+EZ-Tree generation library, presets, editor and assets originate from
+https://github.com/ASunYC/ez-tree at 135ac2bf85875eacf5637d18062e690cf16a1837.
+Original project: https://github.com/dgreenheck/ez-tree
+Copyright (c) 2024 Daniel Greenheck, MIT License.
+See vendor/ez-tree/LICENSE and vendor/ez-tree/provenance.json.
+
+Draco geometry decoder is Copyright The Draco Authors, Apache License 2.0.
+Bundled decoder bytes are from three 0.167.1 examples/jsm/libs/draco/gltf.
+See licenses/draco-APACHE-2.0.txt and the preserved Draco README.
+
+This distribution also uses Three.js, Tweakpane, Electron, the MCP TypeScript
+SDK and other dependencies. Their license notices are retained in the
+desktop runtime third-party/, lib/desktop/licenses/ and lib/mcp/licenses/, and in
+lib/plugin/licenses/ in the precompiled plugin.
