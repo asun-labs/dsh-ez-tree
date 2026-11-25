@@ -16,6 +16,6 @@ test('compiled native client registers the exact npm identity and exports execut
   assert.notEqual(registration.id, '@asun-labs/dsh-ez-tree')
   const plugin = registration.factory(require)
   assert.equal(typeof plugin.apply, 'function')
-  assert.ok(plugin.inject.includes('slots'))
+  assert.ok(plugin.inject.includes('sidebarRight'))
   assert.ok(plugin.inject.includes('connection'))
 })

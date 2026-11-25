@@ -1,6 +1,6 @@
 # dsh-ez-tree
 
-One product repository owns the independent EZ-Tree desktop editor, thin Seal/DSH integration, MCP and bundled skills. Keep business implementation out of the Seal host. Preserve vendor files and provenance; change adapters in app/ instead. Do not depend on sibling development checkouts at runtime.
+This repository owns the skill-driven EZ-Tree editor loaded in the host's existing right-side browser, native session tools, and optional independent desktop/MCP compatibility. Keep business implementation out of the Seal host. Do not add a permanent navigation entry or custom sidebar pane. Preserve vendor files and provenance; change adapters in app/ instead. Do not depend on sibling development checkouts at runtime.
 
 Engineering contracts live in `docs/contracts.md`. When working alongside Seal Harness, use its existing Trellis workflow and applicable engineering/application contracts; the initial delivery task is `11-25-dsh-ez-tree` in that checkout. Do not initialize or overwrite another project's Trellis template.
 

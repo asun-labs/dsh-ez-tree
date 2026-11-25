@@ -21,7 +21,7 @@ export default {
           const timer = setTimeout(done, 32);
           const frame = requestAnimationFrame(done);
           function done() { clearTimeout(timer); cancelAnimationFrame(frame); resolve(); }
-        });`).replace('const treeCount = 100;', "const treeCount = new URLSearchParams(location.search).has('automation') ? 0 : 100;")
+        });`).replace('const treeCount = 100;', "const treeCount = new URLSearchParams(location.search).has('automation') || new URLSearchParams(location.search).has('embedded') || /^\\/view\\/[^/]+\\/index\\.html$/.test(location.pathname) ? 0 : 100;")
       }
       if (id.endsWith('/vendor/ez-tree/src/app/rocks.js')) return source.replace('https://www.gstatic.com/draco/versioned/decoders/1.5.7/', './draco/')
       // 大模型超过 65535 顶点时，上游 Uint16 索引会溢出。

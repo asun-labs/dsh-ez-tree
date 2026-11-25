@@ -105,8 +105,17 @@ def main():
         result = migration['steps'][key]
         if result.get('migration') != 'passed' or not result.get('physicalLegacyRemoved') or not result.get('idempotent'):
             raise RuntimeError('Profile migration verification incomplete: ' + key)
-    if not migration['steps']['canonicalHostClient'].get('passed'):
-        raise RuntimeError('Upgraded Host/Client verification incomplete')
+    session = json.loads((ROOT / '.build/session-browser-verification.json').read_text(encoding='utf-8'))
+    if session.get('version') != version or session.get('sha256') != artifact_hash:
+        raise RuntimeError('Session browser verification does not match this exact plugin archive')
+    for carrier in ['seal', 'native']:
+        result = session['carriers'][carrier]
+        required = ['passed', 'builtinBrowser', 'bundledSkill', 'nativeTools', 'sharedManualState',
+                    'realCanvas', 'coloredTransparentPng', 'texturedGlb', 'rawOptionsJson']
+        if result.get('artifactSha256') != artifact_hash or not all(result.get(key) is True for key in required):
+            raise RuntimeError('Real built-in browser verification incomplete: ' + carrier)
+        if result.get('permanentNav') != 0:
+            raise RuntimeError('Unexpected permanent editor navigation: ' + carrier)
     asset_names = {package_filename, package_filename + '.json', package_filename + '.sha256',
                    'runtime.json', 'validation.json', 'RELEASE-NOTES.md', 'SHA256SUMS'}
     for record in manifest['platforms'].values():

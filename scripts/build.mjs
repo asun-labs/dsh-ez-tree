@@ -1,10 +1,23 @@
 import { build } from 'esbuild'
 import { build as viteBuild } from 'vite'
 import { mkdir, readFile, readdir, copyFile, writeFile } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 export const root = fileURLToPath(new URL('..', import.meta.url))
+
+// SDK 的 UA 元数据属于其自身包；打包重定位后不能相对插件的 lib/ 读取。
+export function nativeSdkMetadata() {
+  return { name: 'native-sdk-package-metadata', setup(builder) {
+    builder.onLoad({ filter: /[\\/]node_modules[\\/]@deepseek-ai[\\/]dsh-llm[\\/]lib[\\/]index\.js$/ }, async ({ path }) => {
+      const source = await readFile(path, 'utf8')
+      const statement = 'const { version } = createRequire(import.meta.url)("../package.json");'
+      if (source.split(statement).length !== 2) throw new Error('DSH SDK 元数据结构已变化，请重新核对打包适配。')
+      const metadata = JSON.parse(await readFile(resolve(dirname(path), '../package.json'), 'utf8'))
+      return { contents: source.replace(statement, `const { version } = ${JSON.stringify({ version: metadata.version })};`), loader: 'js', resolveDir: dirname(path) }
+    })
+  } }
+}
 
 async function licenses(inputs, destination) {
   const packages = [...new Set(Object.keys(inputs).filter(path => path.startsWith('node_modules/')).map(path => {
@@ -30,7 +43,7 @@ export async function buildAll() {
   await licenses(desktop.metafile.inputs, resolve(root, 'lib/desktop/licenses'))
   const mcp = await build({ ...common, metafile: true, entryPoints: ['mcp/cli.mjs'], outfile: resolve(root, 'lib/mcp/cli.mjs') })
   await licenses(mcp.metafile.inputs, resolve(root, 'lib/mcp/licenses'))
-  const plugin = await build({ ...common, metafile: true, entryPoints: ['plugin/index.mjs'], outfile: resolve(root, 'lib/plugin/index.mjs') })
+  const plugin = await build({ ...common, metafile: true, plugins: [nativeSdkMetadata()], entryPoints: ['plugin/index.mjs'], outfile: resolve(root, 'lib/plugin/index.mjs') })
   const upgrade = await build({ ...common, metafile: true, entryPoints: ['plugin/upgrade-profile.mjs'], outfile: resolve(root, 'lib/upgrade-profile.mjs') })
   await licenses({ ...plugin.metafile.inputs, ...upgrade.metafile.inputs }, resolve(root, 'lib/plugin/licenses'))
   const manifest = JSON.parse(await readFile(resolve(root, 'package.json')))

@@ -2,10 +2,12 @@ import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { RuntimeManager, packageRoot } from './runtime.mjs'
+import { ProjectStore } from './projects.mjs'
+import { registerNativeEditor } from './session-host.mjs'
 
 export const name = 'dsh-ez-tree'
-export const usage = '完整 EZ-Tree 桌面编辑器、树木生成 MCP 和内置技能。'
-export const inject = ['connection', 'webServer']
+export const usage = '调用 ez-tree 技能，在当前会话按需打开真实三维编辑面板，与智能体共同调参与导出。'
+export const inject = ['connection', 'webServer', 'tools', 'skills', 'workingDirectory']
 
 const actions = new Set(['status', 'install', 'open', 'close', 'uninstall', 'prepareMcp', 'installSkill'])
 const accountScope = snapshot => createHash('sha256').update(`${snapshot.mode}:${snapshot.accountId}:${snapshot.epoch}`).digest('hex').slice(0, 16)
@@ -175,35 +177,47 @@ export function createHost(ctx, { Manager = RuntimeManager, loadSkill = () => re
   } }
 }
 
-export function apply(ctx) {
-  const host = createHost(ctx)
+export function registerRpcRoute(ctx, handle, { allowedActions = actions } = {}) {
   // 原生 0.2.2-rc.3 的自定义 RPC 通道路由丢失 webServer 注入作用域；保留相同协议，使用公开路由与准入接口。
-  ctx.effect(() => ctx.webServer.register({ kind: 'prefix', path: '/dsh-ez-tree', async handler(request, response) {
-    const admission = ctx.connection.admit(request)
+  ctx.effect(() => ctx.webServer.register({ kind: 'prefix', path: '/dsh-ez-tree', auth: 'required', async handler(request, response, admittedPeer) {
+    // 0.2.3 由 WebServer 完成鉴权并传入 Peer；重复 admit 会越过 Cordis 的认证子服务注入边界。
+    const admission = admittedPeer === undefined ? ctx.connection.admit(request) : { peer: admittedPeer }
     if (admission.rejection !== undefined) { response.writeHead(admission.rejection); response.end(); return }
     const action = new URL(request.url, 'http://localhost').pathname.slice('/dsh-ez-tree/'.length)
-    if (request.method !== 'POST' || !actions.has(action)) { response.writeHead(404); response.end(); return }
+    if (request.method !== 'POST' || !allowedActions.has(action)) { response.writeHead(404); response.end(); return }
     if (String(request.headers['content-type']).split(';')[0].trim().toLowerCase() !== 'application/json') { response.writeHead(415); response.end(); return }
     const controller = new AbortController()
     const abort = () => controller.abort()
+    const closed = () => { if (!response.writableEnded) controller.abort() }
     request.once('aborted', abort)
+    response.once?.('close', closed)
     try {
       const chunks = []
       let size = 0
       for await (const chunk of request) {
-        size += chunk.length
+        const buffer = Buffer.from(chunk)
+        size += buffer.byteLength
         if (size > 16384) { response.writeHead(413); response.end(); return }
-        chunks.push(Buffer.from(chunk))
+        chunks.push(buffer)
       }
       let message
       try { message = JSON.parse(Buffer.concat(chunks).toString('utf8')) } catch { response.writeHead(400); response.end(); return }
       if (!message || typeof message !== 'object' || Array.isArray(message) || message.type !== 'client-request'
         || typeof message.rpcId !== 'string' || !message.rpcId || message.rpcId.length > 256 || message.method !== action
         || Object.keys(message).some(key => !['type', 'rpcId', 'method', 'payload'].includes(key))) { response.writeHead(400); response.end(); return }
-      const result = await host.handle(action, message.payload, controller.signal, admission.peer)
+      const result = await handle(action, message.payload, controller.signal, admission.peer)
       if (!response.destroyed) { response.writeHead(200, { 'content-type': 'application/json' }); response.end(JSON.stringify({ type: 'server-response', rpcId: message.rpcId, result })) }
-    } finally { request.removeListener('aborted', abort) }
+    } finally { request.removeListener('aborted', abort); response.removeListener?.('close', closed) }
   } }), 'dsh-ez-tree: authenticated RPC route')
+}
+
+export function apply(ctx) {
+  const host = createHost(ctx)
+  const projects = new ProjectStore()
+  const editor = registerNativeEditor(ctx, { store: projects })
+  const allowedActions = new Set([...actions, ...Object.keys(editor.handlers)])
+  registerRpcRoute(ctx, (action, payload, signal, peer) => Object.hasOwn(editor.handlers, action)
+    ? editor.handle(action, payload, signal, peer) : host.handle(action, payload, signal, peer), { allowedActions })
   ctx.inject?.(['sealHarnessIdentity'], inner => inner.effect(host.watchIdentity, 'dsh-ez-tree: identity'))
-  ctx.effect(() => () => host.dispose(), 'dsh-ez-tree: lifecycle')
+  ctx.effect(() => async () => { projects.dispose(); await editor.dispose(); await host.dispose() }, 'dsh-ez-tree: lifecycle')
 }

@@ -1,11 +1,11 @@
 {
   "appId": "com.asun-labs.ez-tree",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "platforms": {
     "win32-x64": {
-      "url": "https://github.com/asun-labs/dsh-ez-tree/releases/download/v0.1.1/dsh-ez-tree-0.1.1-win32-x64.zip",
-      "sha256": "0e3c239cd744ad69d72240299d45a7e84e079ce7aa288e66f148662bfba8bd17",
-      "bytes": 170937101,
+      "url": "https://github.com/asun-labs/dsh-ez-tree/releases/download/v0.1.2/dsh-ez-tree-0.1.2-win32-x64.zip",
+      "sha256": "fc490b18e8800903f137ac58f7d49e678f53e3364939ff8e765daa96f341ea4f",
+      "bytes": 170943054,
       "executable": "EZ-Tree.exe",
       "mcp": {
         "entry": "resources/app/lib/mcp/cli.mjs",
@@ -42,7 +42,7 @@
         {
           "path": "EZ-Tree.exe",
           "bytes": 250460672,
-          "sha256": "892aa55acf91394d3fb1ba540c7702ca1644164c8df24ab2acae1053a2c871ad"
+          "sha256": "098305d94348fba86a7167c619d2aaf8ef04095c687b45f2a614aef8a1ef7023"
         },
         {
           "path": "ffmpeg.dll",
@@ -387,12 +387,12 @@
         {
           "path": "resources/app/lib/desktop/main.mjs",
           "bytes": 165834,
-          "sha256": "2653a0d94092c80a49ae8a9a60d21785096cd8a91a4317d61392752d03089ee5"
+          "sha256": "12ad34d1725ac3a7661f51cb5f62fbb14464c3c658de412180b7ca1e1a60b38f"
         },
         {
           "path": "resources/app/lib/desktop/main.mjs.map",
           "bytes": 293412,
-          "sha256": "9a9547ad266349883a7a7868a9aa5579c9dbf39ca59d16122c6bf78c353c5937"
+          "sha256": "79c0d656ac04cfe89d57259b46c743e9037ac3773ee66625c33e8f5ba45c9c95"
         },
         {
           "path": "resources/app/lib/editor/ambience.mp3",
@@ -445,19 +445,19 @@
           "sha256": "c25dd17eccca2f2b1a7dd3a078d0454bd0b595e9fdb6b623068dae095e42eb6b"
         },
         {
-          "path": "resources/app/lib/editor/assets/index-DSqtVVO_.css",
-          "bytes": 1989,
-          "sha256": "eda3e6d73732d54556e7432e5dad627c2e30108cf40f91dcf8299bd86b5a9789"
+          "path": "resources/app/lib/editor/assets/index-CXhfE_Ab.js",
+          "bytes": 749091,
+          "sha256": "344a684e68a52d906537bdbc930f470e97222701585f0530476fb97135cdcf4d"
         },
         {
-          "path": "resources/app/lib/editor/assets/index-nwdSYvZW.js",
-          "bytes": 733677,
-          "sha256": "c9434c3c47740bf43c0f3eeacbb2059ca3597c10ddc352cf162d45d3e5be89cc"
+          "path": "resources/app/lib/editor/assets/index-Da2LWe6m.css",
+          "bytes": 3223,
+          "sha256": "45358d2ffb8ac2d0921d9ed439ece533abd10250c29255048f031c8bbfb6f0ca"
         },
         {
-          "path": "resources/app/lib/editor/assets/lib-C2Wpqvfl.js",
+          "path": "resources/app/lib/editor/assets/lib-DDWKalQv.js",
           "bytes": 25539,
-          "sha256": "8b96e430541cb86b5dbfba686119d8f26a98915e93f50b60e59499476e49a0c5"
+          "sha256": "d05c73c3c7eec60c9fa359f5353f9200c533ad6f50df471a6bf48ddaa1dbf1ea"
         },
         {
           "path": "resources/app/lib/editor/assets/oak_ao_1k-DUJgKwMD.jpg",
@@ -510,9 +510,9 @@
           "sha256": "85b9fa99b700bbb629c90cee5deeebec78fef7cd40443aa361f5edb090fd3341"
         },
         {
-          "path": "resources/app/lib/editor/assets/scene-DTAxIehv.js",
-          "bytes": 72245,
-          "sha256": "9fc28b53da27e11e75adc3c09acc26a90b110a2fc975ea8c1924608eb720a098"
+          "path": "resources/app/lib/editor/assets/scene-BLdcv7ws.js",
+          "bytes": 72355,
+          "sha256": "076f594d356a0a7dd9a4e02664d9d56857c016e61ab998ef6bc69f1b25f48d80"
         },
         {
           "path": "resources/app/lib/editor/assets/willow_ao_1k-CEi-a1m7.jpg",
@@ -626,8 +626,8 @@
         },
         {
           "path": "resources/app/lib/editor/index.html",
-          "bytes": 1602,
-          "sha256": "3f2750b733fb58207a337d7bb33f351564b6c83dc7dbb1795db36439a4c5e7f3"
+          "bytes": 1720,
+          "sha256": "53b989525de225e8fe0fd114a6077a66acb53f08e686eb8cc1ec0722c8530a96"
         },
         {
           "path": "resources/app/lib/editor/logo.png",
@@ -667,12 +667,12 @@
         {
           "path": "resources/app/lib/mcp/cli.mjs",
           "bytes": 766136,
-          "sha256": "e80f8367540045588ae1c58025a9f620d229ddadbfe8b0b1be05e2d3048d23a2"
+          "sha256": "a10d2388ade7a88b1091866cde3aa127eb24fca2a17c5f48a446880547d29d2f"
         },
         {
           "path": "resources/app/lib/mcp/cli.mjs.map",
           "bytes": 1259096,
-          "sha256": "2547fa868cfcbc19e72d97b1c6a89d68fde3e38810c23e4115328579f2e822ea"
+          "sha256": "0f6814d274b7d9b51bfec02f7afdc8e937e7f9c5fe188b33f2a874be68c030e0"
         },
         {
           "path": "resources/app/lib/mcp/licenses/@modelcontextprotocol-sdk-LICENSE",
@@ -736,8 +736,8 @@
         },
         {
           "path": "resources/app/package.json",
-          "bytes": 270,
-          "sha256": "0664bc5ec9e504ad843507f836704e1e2ddb6db5bc79fe6c4f785e165195f4c7"
+          "bytes": 304,
+          "sha256": "def26ef45f67c821a54145565e6627204e732dcf91801a3d7a6092991a8510ac"
         },
         {
           "path": "resources/app/provenance.json",
@@ -806,5 +806,10 @@
         }
       ]
     }
+  },
+  "sessionEditor": {
+    "protocolVersion": 1,
+    "payload": "lib/editor",
+    "requiresDesktopRuntime": false
   }
 }

@@ -198,7 +198,7 @@ export async function upgradeProfile({ home, profile = 'desktop', archive, cli, 
 
 export async function main(argv = process.argv.slice(2)) {
   if (argv.includes('--help')) {
-    console.log('将旧 scoped EZ-Tree 安全迁移为 dsh-ez-tree，保留 Profile 启停与配置。\n用法：node lib/upgrade-profile.mjs --home <DSH_HOME> --profile desktop --cli <官方DSH/lib/bin.js> --package <dsh-ez-tree-0.1.1.tgz> --host-stopped\n示例：node lib/upgrade-profile.mjs --home C:/Users/me/.seal-harness --profile desktop --cli C:/DSH/node_modules/@deepseek-ai/dsh/lib/bin.js --package ./dsh-ez-tree-0.1.1.tgz --host-stopped')
+    console.log(`将 EZ-Tree 升级为 dsh-ez-tree@${VERSION}，兼容旧 scoped 名称并保留 Profile 启停与配置。\n用法：node lib/upgrade-profile.mjs --home <DSH_HOME> --profile desktop --cli <官方DSH/lib/bin.js> --package <dsh-ez-tree-${VERSION}.tgz> --host-stopped\n示例：node lib/upgrade-profile.mjs --home C:/Users/me/.seal-harness --profile desktop --cli C:/DSH/node_modules/@deepseek-ai/dsh/lib/bin.js --package ./dsh-ez-tree-${VERSION}.tgz --host-stopped`)
     return
   }
   const value = key => { const index = argv.indexOf(key); return index < 0 ? undefined : argv[index + 1] }

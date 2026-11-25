@@ -9,7 +9,7 @@ on:
         type: boolean
         default: false
       release_tag:
-        description: '需要发布的现有版本标签，如 v0.1.1'
+        description: '需要发布的现有版本标签，如 v0.1.2'
         type: string
         default: ''
 permissions:
@@ -84,7 +84,8 @@ jobs:
         run: |
           node --input-type=module <<'JS'
           import {readdir, readFile, writeFile} from 'node:fs/promises';
-          const merged = {appId:'com.asun-labs.ez-tree', version:JSON.parse(await readFile('package.json')).version, platforms:{}};
+          const previous = JSON.parse(await readFile('releases/runtime.json'));
+          const merged = {...previous, appId:'com.asun-labs.ez-tree', version:JSON.parse(await readFile('package.json')).version, platforms:{}};
           for(const name of (await readdir('dist')).filter(name=>/^runtime-.*\.json$/.test(name))) {
             const current=JSON.parse(await readFile('dist/'+name));
             if(current.appId!==merged.appId||current.version!==merged.version)throw Error('版本不一致');

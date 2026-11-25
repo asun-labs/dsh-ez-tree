@@ -1,49 +1,53 @@
-# 产品工程契约
+# 会话编辑器工程契约
 
 ## 1. 范围与触发
 
-修改独立应用、Seal 接入、MCP、技能、安装器或发行物时遵守本契约。业务由独立应用拥有；插件只负责接入。上游 vendor 原字节与来源哈希保持一致，适配写在 app/。
+主使用路径为安装启用插件 → 原生内置 ez-tree 技能 → 当前会话原生工具 → 按需三维右栏。不能用常驻管理页、静态预览或独立 MCP 的另一棵树代替真实会话编辑。独立应用与外部 MCP 是兼容方式。
 
-0.1.1 起包名统一为 `dsh-ez-tree`，历史包名 `@asun-labs/dsh-ez-tree` 只用于迁移识别。Loader 必须注册当前 package.name；Cordis entry `dsh-ez-tree`、应用 ID、账号目录、RPC、MCP 工具/连接器 ID 和技能名均保持稳定。旧 profile 迁移、回滚及幂等契约见 [upgrade.md](upgrade.md)。
+## 2. 公开接口
 
-## 2. 接口
+- Host工具：ez_tree_open_editor / ez_tree_editor_get / ez_tree_editor_generate / ez_tree_editor_export。会话来自 exec.agent.id，目录来自 workingDirectory.ensure；不能由模型参数指定任意账号、会话或输出目录。
+- bundled SkillProvider 提供 ez-tree，不要求手工复制到管理数据库。保留用户自定义优先级，只迁移原样匹配的旧托管副本。
+- Client使用公开 mounted 订阅和 openTab('browser', {params:{url}})，复用宿主现有右侧浏览器；不注册自定义 sidebarRightTabs、main、sidebar.panellist 或 Seal 一级导航，不依赖私有 openTabIn。
+- RPC /dsh-ez-tree/{editorWatch,editorRead,editorEdit,editorExport,editorAck,editorFail}；长轮询带游标、取消与账号指纹。保留旧管理RPC作为兼容，但新流程不依赖它。
+- 两版内置浏览器均拒绝加载应用自身 origin。主流程通过插件专用的 127.0.0.1 随机端口加载编辑页，不放宽宿主导航策略。Owner RPC 只向可信客户端签发绑定账号、epoch、会话的页面地址；一次性短效 fragment 授权兑换每视图 HttpOnly、SameSite=Strict cookie，随后清除 fragment。视图 ID 本身不授权，页面不持有宿主通用凭据。
+- 专用页面 API 只支持绑定项目的 read/watch/edit/export/ack/fail/upload，检查精确 Origin，不开放 CORS 或任意文件路径。二进制最高128MiB；普通 Owner RPC 保持16KiB上限。静态资源与上传共用有界业务函数，不伪造 Owner Peer，也不额外注册应用内部编辑页路由。
 
-- Host Connection RPC `/dsh-ez-tree`，action 为 `status/install/open/close/uninstall/prepareMcp/installSkill`，payload 固定空对象，只允许 owner principal。
-- 返回 `{ok:true,value}` 或 `{ok:false,error:{code,message,details:{}}}`；应用就绪与进程已创建分别处理。
-- MCP stdio 工具为 `ez_tree_list_presets/ez_tree_get_parameters/ez_tree_generate/ez_tree_export`。参数以 SDK 实际 schema 为准，生成与 UI 共享 `app/options.js` 验证规则。
-- MCP 配置使用同包可执行程序，环境 `ELECTRON_RUN_AS_NODE=1`，参数为受校验的 `lib/mcp/cli.mjs` 绝对路径及 `--account <id> --output-dir <directory>`。启动器通过带随机令牌的本机管道调用隐藏渲染器；不依赖系统 Node。桌面 `--verify` 与 `--verify-ui` 是隐藏验收入口。
+## 3. 状态与生命周期
 
-## 3. 数据、环境与发布
+Host ProjectStore 是唯一已提交状态，按账号与真实会话隔离，保存完整 TreeOptions、preset、seed、revision 和 optionsDigest。数据根为 DSH_HOME 或 ~/.seal-harness；原 ez-tree/accounts 路径、应用ID、工具/连接器/技能既有身份保持稳定。
 
-`DSH_HOME` 优先于 `~/.seal-harness`。账号目录为 `ez-tree/accounts/<sha256(accountId)[0:16]>`。运行时安装在此目录下 `runtime/<version>/<platform>-<arch>`，用户输出在 `exports`；普通卸载保留用户数据。
+工具与手动意图走同一项目队列。先发布待渲染command，得到实际网格统计和匹配摘要的ACK后，才原子提交修订。初次打开、工作目录变更也不能先提交再等ACK。渲染、保存或取消失败恢复原项目；未提交的状态不能作为导出成功结果。
 
-Seal 有身份服务时只接受已登录账号，并核对 accountId 与 epoch。服务缺席时原生 DSH 使用 `local-owner`，不能把 Seal 登出当成本机回退。账号切换中止任务并关闭插件拥有的编辑器进程。
+右侧浏览器页面直接消费绑定项目的 watch/ACK；手动意图的等待不能阻塞渲染命令，否则会形成循环等待。旧 iframe MessageChannel 可作为兼容传输，但不能用新自定义布局替代宿主浏览器。账号变化及卸载撤销授权并取消等待；重新打开或刷新应恢复已提交项目，不能另造一棵随机树。
 
-受信 `releases/runtime.json` 包含 appId、版本、平台及固定 GitHub Release URL、字节数、压缩包 SHA256、可执行入口和逐文件清单。应用、插件、标签、发布清单版本一致。插件与桌面包分发预编译内容；同版本已发布附件不覆盖。
+## 4. 验证与错误矩阵
 
-## 4. 错误矩阵
-
-| 条件 | 必须行为 |
+| 情况 | 必须行为 |
 | --- | --- |
-| 非 owner、登出、账号变化 | 拒绝或中止，不展示旧账号配置 |
-| 未验证平台 | 不提供猜测的可执行程序或安装包 |
-| 下载/哈希失败、ZIP 路径越界或链接 | 拒绝安装，清理临时载荷 |
-| 替换失败 | 恢复旧程序；恢复也失败时保留备份并报告实际位置 |
-| 应用未就绪或版本/PID/程序身份不匹配 | 不报告运行可用 |
-| MCP 仍启用时卸载 | 提示先停用，不修改无关连接器 |
-| 导出同名文件 | MCP 拒绝覆盖；GUI 经系统保存对话框明确选择后可替换 |
-| 无效参数或过高复杂度 | 在改变模型前拒绝 |
+| Native0.2.3已传入认证Peer | 使用已认证Peer，不重复访问受限connection.authentication |
+| Sealrc3无第三Peer参数 | 使用原Connection准入，保留owner校验 |
+| 参数未知/越界、过高复杂度 | 生成前拒绝，保留原模型 |
+| 手动与工具修订冲突 | 拒绝陈旧覆盖，恢复当前已提交快照 |
+| 面板未就绪、关闭或WebGL失败 | 不报告打开/生成成功，给出可重试错误 |
+| 上传超限、格式不符、过期操作或取消 | 不发布文件，释放工具等待 |
+| 会话工作目录变化 | 重新确认目录后再修改/导出，不能写旧目录 |
+| 无权限/跨账号/旧epoch | 拒绝或中止，不向新账号回显旧项目 |
+
+导出必须包含真实网格/图片。GLB校验资产版本与mesh，PNG校验尺寸与结束块；实际浏览器验收还必须检查彩色前景与透明背景，不能把黑色剪影或仅有文件头当成功。
 
 ## 5. 基础、正常、错误案例
 
-基础：独立解压桌面包后，无系统 Node 和开发目录仍可生成与导出。正常：安装插件、安装应用、准备停用的 MCP、用户选择会话后生成并导出带纹理 GLB。错误：账号切换后旧安装请求不得启动旧账号的程序，旧 MCP 配置不得留在页面。
+基础：安装预编译TGZ后，原生技能可发现，页面没有常驻树木管理入口。正常：工具打开真实面板，AI设seed后手动调参，再用工具读取和导出同一修订。错误：收到合法desktop请求却重复admit导致认证注入异常，不能通过放宽JSON协议或伪造owner解决。
 
-## 6. 验证要求
+## 6. 必需验收
 
-`npm run check` 覆盖参数、15 个预设、路径与文件发布、owner/账号/epoch、连接器和技能默认停用、客户端轮询与配置清理、安装摘要与回滚。`verify:desktop` 对实际打包程序在隔离工作目录和空 PATH 下验证版本、真实 GLB/PNG/JSON、完整编辑器与真实 SDK MCP stdio。发布前额外验证已安装实例、关闭/重开、卸载保留数据及精确 tgz 的原生 DSH 安装。构建成功不能替代运行成功，Windows 通过不代表 macOS/Linux 通过。
+npm run check 检查共享状态/CAS/取消/权限/资源路由/包加载/参数边界。纯源码SDK测试不能代替提取TGZ后的隔离进程导入，也不能代替真实宿主。框架SDK的包版本元数据在构建时准确内联，并以唯一匹配断言防止上游漂移；不能补一个lib/package.json欺骗相对路径。
+
+必须在实际Native0.2.3和Sealrc3承载路径检查技能发现、模型可见工具、原生会话身份、按需面板、实际canvas、手动与工具共享、二进制导出及切换/失败。普通HTTP浏览器集成必须单独标注，不能冒充桌面或真实模型调用。截图全黑或未取到图像不算视觉通过。
 
 ## 7. 错误与正确
 
-错误：运行旁边 ez-tree checkout 的 Vite 服务，只提交入口卡片便声称完成交付。正确：桌面发布物包含固定生成器和离线资源，插件安装经过摘要校验的程序，MCP 调用该程序，并用真实导出结果验收。
+错误：把管理按钮页和手工MCP设置当作技能编辑体验。正确：插件携带完整渲染资源，技能调用原生会话工具，真正打开当前项目面板。
 
-错误：插件安装时启用全部会话能力。正确：账号独立连接器和技能以停用状态安装，由用户在能力和会话页面选择。
+错误：隐藏Skybox Mesh.visible后仍声称PNG正常。正确：仅屏蔽环境网格的渲染层，保留其子灯光，结束恢复；用真实导出像素验证彩色树木。

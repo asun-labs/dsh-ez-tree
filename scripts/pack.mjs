@@ -8,7 +8,7 @@ import { promisify } from 'node:util'
 import { fileURLToPath } from 'node:url'
 import { buildAll, root } from './build.mjs'
 
-const runtimePaths = ['lib/plugin', 'lib/upgrade-profile.mjs', 'lib/upgrade-profile.mjs.map', 'skills', 'releases', 'docs', 'licenses', 'cordis.patch.yml', 'README.md', 'LICENSE', 'NOTICE', 'vendor/ez-tree/LICENSE', 'vendor/ez-tree/provenance.json']
+const runtimePaths = ['lib/plugin', 'lib/editor', 'lib/upgrade-profile.mjs', 'lib/upgrade-profile.mjs.map', 'skills', 'resources', 'releases', 'docs', 'licenses', 'cordis.patch.yml', 'README.md', 'LICENSE', 'NOTICE', 'vendor/ez-tree/LICENSE', 'vendor/ez-tree/provenance.json']
 export function releaseManifest(manifest) {
   const { scripts, devDependencies, dependencies, ...runtime } = manifest
   return { ...runtime, files: runtimePaths, peerDependenciesMeta: { react: { optional: true } } }
@@ -33,7 +33,11 @@ export async function packRelease({ skipBuild = false } = {}) {
   try {
     const manifest = releaseManifest(JSON.parse(await readFile(join(root, 'package.json'))))
     const trusted = JSON.parse(await readFile(join(root, 'releases/runtime.json')))
-    if (trusted.version !== manifest.version || !Object.keys(trusted.platforms).length) throw new Error('必须先完成独立桌面包验收，才能发布插件。')
+    if (trusted.version !== manifest.version) throw new Error('插件与发布清单版本不一致。')
+    if (trusted.sessionEditor?.requiresDesktopRuntime === false) {
+      if (trusted.sessionEditor.protocolVersion !== 1 || trusted.sessionEditor.payload !== 'lib/editor'
+        || !existsSync(join(root, 'lib/editor/index.html'))) throw new Error('会话编辑器载荷缺失，不能打包。')
+    } else if (!Object.keys(trusted.platforms).length) throw new Error('必须先完成独立桌面包验收，才能发布插件。')
     for (const path of runtimePaths) {
       await mkdir(dirname(join(stage, path)), { recursive: true })
       await cp(join(root, path), join(stage, path), { recursive: true })

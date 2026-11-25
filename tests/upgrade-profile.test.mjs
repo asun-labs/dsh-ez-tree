@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { gzipSync } from 'node:zlib'
+import { VERSION } from '../version.mjs'
 import { parse } from 'yaml'
 import { upgradeProfile, migrateManifest, migratePatch, LEGACY_PACKAGE, CANONICAL_PACKAGE } from '../plugin/upgrade-profile.mjs'
 
@@ -22,7 +23,7 @@ async function fixture(t, { selected = true, duplicate = false, failInstall = fa
   await mkdir(profileDir, { recursive: true })
   const legacy = join(root, 'legacy.tgz')
   const target = join(root, 'new.tgz')
-  const newManifest = { name: CANONICAL_PACKAGE, version: '0.1.1', dsh: { bundle: { patch: './cordis.patch.yml' } } }
+  const newManifest = { name: CANONICAL_PACKAGE, version: VERSION, dsh: { bundle: { patch: './cordis.patch.yml' } } }
   await writeFile(target, archive(newManifest))
   await writeFile(legacy, archive({ name: LEGACY_PACKAGE, version: '0.1.0' }))
   const original = { name: 'test-profile', private: true, description: 'preserve me', dependencies: { other: '1.2.3', [LEGACY_PACKAGE]: `file:${legacy}` },
@@ -136,7 +137,7 @@ test('failed rollback leaves saved configuration and reports retained recovery b
 test('explicit stopped-host acknowledgment and exact canonical artifact identity are mandatory', async t => {
   const f = await fixture(t)
   await assert.rejects(upgradeProfile({ ...f.options, hostStopped: false }), /彻底退出/)
-  await writeFile(f.target, archive({ name: LEGACY_PACKAGE, version: '0.1.1', dsh: { bundle: {} } }))
-  await assert.rejects(upgradeProfile(f.options), /只接受 dsh-ez-tree@0.1.1/)
+  await writeFile(f.target, archive({ name: LEGACY_PACKAGE, version: VERSION, dsh: { bundle: {} } }))
+  await assert.rejects(upgradeProfile(f.options), new RegExp('只接受 dsh-ez-tree@'+VERSION.replaceAll('.', '\\.')))
   assert.equal(await readFile(f.packageFile, 'utf8'), f.originalPackage)
 })

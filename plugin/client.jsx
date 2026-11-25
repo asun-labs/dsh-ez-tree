@@ -1,132 +1,141 @@
-import React, { useEffect, useRef, useState } from 'react'
+/** Open the editor in the application's existing Browser tab; no plugin-owned panel. */
+export const inject = ['sidebarRight', 'connection']
 
-export const inject = ['slots', 'layout', 'connection']
+const CHANNEL = '/dsh-ez-tree'
+const messageOf = error => typeof error === 'string' ? error : error?.message || '右侧浏览器打开失败。'
+const wait = (milliseconds, signal) => new Promise(resolve => {
+  if (signal.aborted) return resolve()
+  const finish = () => { clearTimeout(timer); signal.removeEventListener('abort', finish); resolve() }
+  const timer = setTimeout(finish, milliseconds)
+  signal.addEventListener('abort', finish, { once: true })
+})
 
-const labels = { install: '安装桌面应用', open: '打开编辑器', close: '关闭编辑器', uninstall: '卸载应用', prepareMcp: '准备 MCP', installSkill: '安装内置技能' }
-const styles = `
-.ez-tree-panel{box-sizing:border-box;padding:28px var(--seal-page-inset,28px);color:var(--dsw-alias-label-primary,inherit);font:inherit;height:100%;overflow:auto}
-.ez-tree-panel *{box-sizing:border-box}.ez-tree-panel h1{font-size:24px;line-height:32px;font-weight:600;margin:0 0 12px}
-.ez-tree-panel p{line-height:1.7}.ez-tree-panel .ez-tree-muted{color:var(--dsw-alias-label-secondary,inherit)}
-.ez-tree-card{border:1px solid var(--dsw-alias-border-l1,currentColor);background:var(--dsw-alias-bg-layer-1,transparent);border-radius:12px;padding:20px;margin:20px 0}
-.ez-tree-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}.ez-tree-panel button{font:inherit;color:inherit;background:var(--dsw-alias-bg-layer-1,transparent);border:1px solid var(--dsw-alias-border-l1,currentColor);border-radius:8px;padding:8px 14px;cursor:pointer}
-.ez-tree-panel button:hover:not(:disabled){background:var(--dsw-alias-bg-layer-2,transparent)}.ez-tree-panel button:focus-visible{outline:2px solid currentColor;outline-offset:3px}.ez-tree-panel button:disabled{opacity:.45;cursor:default}
-.ez-tree-panel dl{display:grid;grid-template-columns:100px minmax(0,1fr);gap:10px;margin:0}.ez-tree-panel dt{color:var(--dsw-alias-label-secondary,inherit)}.ez-tree-panel dd{margin:0;overflow-wrap:anywhere}
-.ez-tree-panel pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.6;user-select:text}.ez-tree-panel [role=alert]{border-left:3px solid currentColor;padding-left:12px}
-.ez-tree-panel .ez-tree-status{display:flex;align-items:center;gap:10px}.ez-tree-panel .ez-tree-status svg{flex-shrink:0}@media(max-width:600px){.ez-tree-panel{padding:20px 16px}.ez-tree-panel dl{grid-template-columns:1fr;gap:5px}.ez-tree-panel dd{margin-bottom:10px}}
-`
-
-export function TreeIcon({ size = 20 }) {
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="m12 2-6 7h3l-5 6h6v7h4v-7h6l-5-6h3Z" strokeLinejoin="round" /></svg>
-}
-
-export function EzTreePanel({ api }) {
-  const [state, setState] = useState(null)
-  const [busy, setBusy] = useState('')
-  const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
-  const [config, setConfig] = useState(null)
-  const [confirmUninstall, setConfirmUninstall] = useState(false)
-  const currentScope = useRef(null)
-  useEffect(() => {
-    let mounted = true
-    let refreshing = false
-    async function refresh() {
-      if (refreshing) return
-      refreshing = true
-      try {
-        const value = await api('status')
-        if (mounted) {
-          if (currentScope.current !== value.accountScope) { setConfig(null); setNotice(''); setConfirmUninstall(false) }
-          currentScope.current = value.accountScope
-          setState(value); setError('')
-        }
-      } catch (issue) {
-        if (mounted) { currentScope.current = null; setState(null); setConfig(null); setNotice(''); setConfirmUninstall(false); setError(issue.message) }
-      }
-      finally { refreshing = false }
-    }
-    void refresh()
-    const timer = setInterval(refresh, 2000)
-    return () => { mounted = false; clearInterval(timer) }
-  }, [api])
-  async function act(action) {
-    setBusy(action); setError(''); setNotice('')
-    try {
-      const value = await api(action)
-      const latest = await api('status')
-      setState(latest)
-      if (value.accountScope !== latest.accountScope) throw new Error('账号已变化，请在当前账号重新操作。')
-      currentScope.current = latest.accountScope
-      if (value.message) setNotice(value.message)
-      if (value.config) setConfig(value.config)
-    } catch (issue) { setConfig(null); setNotice(''); setError(issue.message) }
-    finally { setBusy(''); setConfirmUninstall(false) }
+export function createBuiltinBrowserLauncher(ctx, { now = Date.now, retryDelay = 1000, startupGrace = 15000,
+  onError = error => ctx.logger?.warn?.(`EZ Tree：${messageOf(error)}`) } = {}) {
+  const entries = new Map()
+  let currentId, watching, disposed = false, started = false, accountScope, unsubscribe, unsubscribeGeneration
+  const entryFor = sessionId => {
+    if (!entries.has(sessionId)) entries.set(sessionId, { sessionId, cursor: 0, tabId: null, leaseId: null,
+      scope: undefined, command: null, view: null, seen: new Set(), pending: false, openedAt: 0, actions: new AbortController() })
+    return entries.get(sessionId)
   }
-  const waiting = !!busy || !!state?.busy
-  const canInstall = !!state && state.supported !== false && state.available !== false
-  const installLabel = state?.updateAvailable ? `升级到 ${state.targetVersion}` : '安装桌面应用'
-  return <main className="ez-tree-panel" data-plugin="dsh-ez-tree">
-    <h1>树木生成器</h1>
-    <p className="ez-tree-muted">完整 EZ-Tree 编辑器：实时三维预览、树种预设、枝叶参数、环境调节，以及 GLB、PNG 和参数 JSON 导入导出。</p>
-    <section className="ez-tree-card" aria-label="桌面应用">
-      <h2 className="ez-tree-status"><TreeIcon size={28} /> EZ-Tree</h2>
-      <dl><dt>安装状态</dt><dd>{!state ? '正在读取…' : state.installed ? `已安装 ${state.version ?? ''}` : '尚未安装'}</dd>
-        {state?.updateAvailable && <><dt>可用更新</dt><dd>{state.targetVersion}（当前版本可继续使用）</dd></>}
-        <dt>运行状态</dt><dd>{waiting ? `${labels[busy || state?.busy] ?? '处理'}中…` : state?.running ? '编辑器运行中' : '未运行'}</dd>
-        {state?.dataDirectory && <><dt>数据目录</dt><dd>{state.dataDirectory}</dd></>}
-        {state?.identityMode === 'local' && <><dt>账号范围</dt><dd>本机 DSH 所有者</dd></>}
-      </dl>
-      <p className="ez-tree-muted">安装会下载此插件固定版本的独立桌面程序和资源，无需另外安装 Node.js。项目与导出文件保存在数据目录，卸载应用保留数据。</p>
-      {state?.supported === false && <p role="status">当前平台尚无已验证的桌面发行包。</p>}
-      <div className="ez-tree-actions">
-        <button disabled={waiting || !canInstall || (state?.installed && !state?.updateAvailable) || state?.running} onClick={() => act('install')}>{installLabel}</button>
-        <button disabled={waiting || !state?.installed} onClick={() => act('open')}>打开编辑器</button>
-        <button disabled={waiting || !state?.running} onClick={() => act('close')}>关闭编辑器</button>
-        <button disabled={waiting || !state?.installed} onClick={() => setConfirmUninstall(true)}>卸载应用</button>
-      </div>
-      {state?.updateAvailable && <p className="ez-tree-muted">升级前请关闭编辑器。升级保留项目、导出和旧版程序，已有 MCP 配置可继续使用；重新准备 MCP 后使用新版。</p>}
-      {confirmUninstall && <div role="group" aria-label="确认卸载"><p>卸载 EZ-Tree 程序并保留项目和导出文件？请先保存编辑器中的更改。</p><div className="ez-tree-actions"><button disabled={waiting} onClick={() => act('uninstall')}>确认卸载，保留数据</button><button disabled={waiting} onClick={() => setConfirmUninstall(false)}>取消</button></div></div>}
-    </section>
-    <section className="ez-tree-card" aria-label="智能体集成"><h2>在会话中使用</h2>
-      <p>MCP 使用与编辑器相同的生成引擎，支持查看预设、调整参数、生成模型和导出文件。内置技能提供参数选择和批量生成的操作指导。</p>
-      <p className="ez-tree-muted">准备 MCP 与安装技能后，前往连接器和技能页面按需启用，再为需要的会话选择能力。安装不会自动启用工具或技能。</p>
-      <div className="ez-tree-actions"><button disabled={waiting || !state?.installed} onClick={() => act('prepareMcp')}>准备 MCP</button><button disabled={waiting || !state} onClick={() => act('installSkill')}>安装内置技能</button></div>
-      {config && <details open><summary>MCP 配置</summary><pre>{JSON.stringify({ mcpServers: { 'ez-tree': config } }, null, 2)}</pre></details>}
-    </section>
-    {(error || state?.error) && <p role="alert">{error || state.error}</p>}
-    {notice && <p role="status">{notice}</p>}
-    <footer className="ez-tree-muted">基于 Daniel Greenheck 的 EZ-Tree，遵循 MIT 许可证。独立应用与插件统一维护，资源随发行包离线提供。</footer>
-  </main>
+  const isCurrent = entry => !disposed && currentId === entry.sessionId && ctx.sidebarRight.mounted.getSnapshot() === entry.sessionId
+  async function rpc(action, payload, signal) {
+    const response = await ctx.connection.rpc.call(CHANNEL, action, payload, signal)
+    if (!response?.ok) throw new Error(messageOf(response?.error))
+    return response.value
+  }
+  function clear() {
+    for (const entry of entries.values()) {
+      entry.actions.abort(); entry.actions = new AbortController()
+      entry.cursor = 0; entry.command = null; entry.tabId = null; entry.leaseId = null; entry.scope = undefined
+      entry.view = null; entry.seen.clear(); entry.openedAt = 0
+    }
+  }
+  function observeScope(value) {
+    if (typeof value.accountScope !== 'string' || !value.accountScope) throw new Error('浏览器会话缺少账号范围。')
+    if (accountScope !== undefined && value.accountScope !== accountScope) clear()
+    accountScope = value.accountScope
+  }
+  function inventoryContains(entry) {
+    if (!entry.tabId) return false
+    // 公开只读清单也覆盖浮动页签，不以当前 dock 页签猜测它是否关闭。
+    const tabs = ctx.sidebarRight.openTabs?.getSnapshot()
+    if (Array.isArray(tabs)) return tabs.some(tab => tab.sessionId === entry.sessionId && tab.tabId === entry.tabId && tab.kind === 'browser')
+    return undefined
+  }
+  function focusExisting(entry) {
+    if (!entry.tabId || inventoryContains(entry) === false) return false
+    ctx.sidebarRight.focus(entry.tabId)
+    return inventoryContains(entry) ?? ctx.sidebarRight.active()?.id === entry.tabId
+  }
+  function viewLost(entry) {
+    if (now() - entry.openedAt < startupGrace) return false
+    return !entry.view || entry.view.leaseId !== entry.leaseId || entry.view.connected === false
+  }
+  function remember(entry, operationId) {
+    entry.seen.add(operationId)
+    if (entry.seen.size > 64) entry.seen.delete(entry.seen.values().next().value)
+  }
+  async function launch(entry) {
+    const command = entry.command
+    if (!isCurrent(entry) || command?.kind !== 'apply' || entry.pending) return
+    const alreadySeen = entry.seen.has(command.operationId)
+    const present = inventoryContains(entry)
+    if (alreadySeen && !viewLost(entry)) return
+    // 用户关闭页签不在同一个操作中反复抢回；下一次技能调用再打开新页。
+    if (alreadySeen && present === false) return
+    const signal = entry.actions.signal, scope = entry.scope
+    entry.pending = true
+    try {
+      if (entry.leaseId && !viewLost(entry) && focusExisting(entry)) {
+        remember(entry, command.operationId)
+        return
+      }
+      const oldTab = present !== false ? entry.tabId : null
+      const result = await rpc('editorBrowserLaunch', { sessionId: entry.sessionId }, signal)
+      if (!isCurrent(entry) || signal.aborted || entry.scope !== scope || entry.command?.operationId !== command.operationId) return
+      if (result.accountScope !== scope || typeof result.leaseId !== 'string' || !result.leaseId) throw new Error('浏览器页面的账号范围已变化。')
+      let url
+      try { url = new URL(result.url) } catch { throw new Error('编辑器页面地址无效。') }
+      if (!['http:', 'https:'].includes(url.protocol)) throw new Error('编辑器必须由可信本机 HTTP 服务提供。')
+      ctx.sidebarRight.openTab('browser', { params: { url: url.href }, ...(oldTab ? { replaceTab: oldTab } : {}) })
+      const tab = ctx.sidebarRight.active()
+      if (!tab || tab.kind !== 'browser' || !tab.id) throw new Error('内置右侧浏览器尚未就绪，请启用应用的浏览器功能后重试。')
+      entry.tabId = tab.id; entry.leaseId = result.leaseId; entry.openedAt = now(); remember(entry, command.operationId)
+    } catch (error) {
+      if (isCurrent(entry) && !signal.aborted && entry.command?.operationId === command.operationId) {
+        remember(entry, command.operationId)
+        onError(error)
+        try { await rpc('editorFail', { sessionId: entry.sessionId, operationId: command.operationId, message: messageOf(error) }, signal) } catch {}
+      }
+    } finally {
+      entry.pending = false
+      if (signal.aborted || entry.scope !== scope || entry.command?.operationId !== command.operationId) void launch(entry)
+    }
+  }
+  async function follow(entry, controller) {
+    while (!controller.signal.aborted && isCurrent(entry)) {
+      try {
+        const value = await rpc('editorWatch', { sessionId: entry.sessionId, afterCursor: entry.cursor }, controller.signal)
+        if (controller.signal.aborted || !isCurrent(entry)) return
+        observeScope(value)
+        if (value.cursor < entry.cursor) continue
+        entry.scope = value.accountScope; entry.cursor = value.cursor; entry.command = value.command ?? null; entry.view = value.browserView ?? null
+        void launch(entry)
+      } catch (error) {
+        if (controller.signal.aborted || !isCurrent(entry)) return
+        clear(); accountScope = undefined; onError(error)
+        await wait(retryDelay, controller.signal)
+      }
+    }
+  }
+  function activate(force = false) {
+    const next = ctx.sidebarRight.mounted.getSnapshot()
+    if (!force && currentId === next) return
+    watching?.abort()
+    if (currentId !== undefined) { const old = entryFor(currentId); old.actions.abort(); old.actions = new AbortController() }
+    currentId = next
+    if (disposed || next === undefined) return
+    watching = new AbortController()
+    void follow(entryFor(next), watching)
+  }
+  return {
+    start() {
+      if (started || disposed) return
+      started = true
+      unsubscribe = ctx.sidebarRight.mounted.subscribe(() => activate())
+      unsubscribeGeneration = ctx.connection.generation?.subscribe(() => { clear(); accountScope = undefined; activate(true) })
+      activate()
+    },
+    dispose() { disposed = true; watching?.abort(); unsubscribe?.(); unsubscribeGeneration?.(); clear() },
+  }
 }
 
 export function apply(ctx) {
   ctx.effect(() => {
-    const element = document.createElement('style')
-    element.dataset.plugin = 'dsh-ez-tree'
-    element.textContent = styles
-    document.head.append(element)
-    return () => element.remove()
-  }, 'dsh-ez-tree: styles')
-  const api = async action => {
-    const result = await ctx.connection.rpc.call('/dsh-ez-tree', action, {})
-    if (!result.ok) throw new Error(result.error.message)
-    return result.value
-  }
-  function Panel() { return <EzTreePanel api={api} /> }
-  let disposed = false
-  let nativeReleases = []
-  const releaseNative = () => { nativeReleases.forEach(release => release?.()); nativeReleases = [] }
-  const registerNative = () => {
-    nativeReleases = [
-      ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: 'dsh-ez-tree' }, Panel)),
-      ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: 'dsh-ez-tree', label: '树木生成器', order: 116 }, TreeIcon)),
-    ]
-  }
-  ctx.effect(() => { registerNative(); return () => { disposed = true; releaseNative() } }, 'dsh-ez-tree: native navigation')
-  ctx.inject?.(['sealHarnessNavigation'], inner => inner.effect(() => {
-    // Seal 导航会自行注册 main；先释放原生入口，避免同 key 重复注册。
-    releaseNative()
-    const release = inner.sealHarnessNavigation.register({ id: 'dsh-ez-tree', label: '树木生成器', icon: 'models', order: 116, primary: true, Panel })
-    return () => { release(); if (!disposed) registerNative() }
-  }, 'dsh-ez-tree: navigation'))
+    const launcher = createBuiltinBrowserLauncher(ctx)
+    launcher.start()
+    return () => launcher.dispose()
+  }, 'dsh-ez-tree: built-in Browser launcher')
 }

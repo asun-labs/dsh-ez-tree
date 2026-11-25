@@ -40,8 +40,8 @@ export function setupUI(state, api) {
     catch (error) { api.report(error.message, true) }
   })
   const run = async callback => {
-    try { await callback(); pane.refresh(); api.report('参数已更新') }
-    catch (error) { state.tree.options.copy(state.acceptedOptions); state.tree.generate(); pane.refresh(); api.report(error.message, true) }
+    try { await callback(); api.refreshPane(); api.report('参数已更新') }
+    catch (error) { api.restoreAccepted(); api.refreshPane(); api.report(error.message, true) }
   }
   const controls = treeFolder.addFolder({ title: '生成参数', expanded: true })
   const [seedMin, seedMax, seedStep] = numberRange('seed')
@@ -67,12 +67,18 @@ export function setupUI(state, api) {
   const exports = tab.pages[1]
   for (const [title, format] of [['保存参数 JSON', 'json'], ['导出 GLB 模型', 'glb'], ['导出透明 PNG', 'png']]) {
     exports.addButton({ title }).on('click', async () => {
-      try { await download(api.exportFile, format); api.report(`已导出 tree.${format}`) }
+      try {
+        if (api.embedded) {
+          const result = await api.requestExport(format)
+          if (result?.path) api.report(`已保存到：${result.path}`)
+        } else { await download(api.exportFile, format); api.report(`已导出 tree.${format}`) }
+      }
       catch (error) { api.report(`导出失败：${error.message}`, true) }
     })
   }
   exports.addButton({ title: '导入参数 JSON' }).on('click', () => document.getElementById('fileInput').click())
-  document.getElementById('fileInput').addEventListener('change', async event => {
+  const fileInput = document.getElementById('fileInput')
+  const importFile = async event => {
     const file = event.target.files[0]
     if (!file) return
     try {
@@ -82,6 +88,8 @@ export function setupUI(state, api) {
       api.report(`已导入 ${file.name}`)
     } catch (error) { api.report(`导入失败：${error.message}`, true) }
     finally { event.target.value = '' }
-  })
+  }
+  fileInput.addEventListener('change', importFile)
+  state.cleanups.push(() => fileInput.removeEventListener('change', importFile))
   return pane
 }

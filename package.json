@@ -1,7 +1,7 @@
 {
   "name": "dsh-ez-tree",
-  "version": "0.1.1",
-  "description": "EZ-Tree 完整桌面编辑器、Seal 接入、MCP 与内置技能",
+  "version": "0.1.2",
+  "description": "技能按需在右侧浏览器打开真实三维树木编辑器，共享会话参数并导出模型",
   "type": "module",
   "license": "MIT",
   "main": "lib/plugin/index.mjs",
@@ -22,7 +22,8 @@
     "docs",
     "licenses",
     "vendor/ez-tree/LICENSE",
-    "vendor/ez-tree/provenance.json"
+    "vendor/ez-tree/provenance.json",
+    "resources"
   ],
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
@@ -55,9 +56,9 @@
     "client": {
       "platform": "web",
       "inject": [
-        "@deepseek-ai/dsh-client-ui-renderer",
-        "@deepseek-ai/dsh-client-ui-layout",
-        "@deepseek-ai/dsh-client-connection"
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-ui-sidebar-right",
+        "@deepseek-ai/dsh-client-ui-sidebar-browser"
       ]
     }
   },
@@ -65,6 +66,7 @@
     "react": "^18.3.1"
   },
   "devDependencies": {
+    "@deepseek-ai/dsh-tools": "0.2.2-rc.3",
     "@modelcontextprotocol/sdk": "1.32.2",
     "electron": "45.5.0",
     "electron-builder": "26.18.0",

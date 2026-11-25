@@ -96,7 +96,7 @@ export async function packageDesktop({ skipBuild = false } = {}) {
   const trustedPath = resolve(root, 'releases/runtime.json')
   const previous = existsSync(trustedPath) ? JSON.parse(await readFile(trustedPath)) : {}
   if (previous.version !== undefined && previous.version !== manifest.version) throw new Error('发布清单版本不一致，拒绝混合平台。')
-  const trusted = { appId: 'com.asun-labs.ez-tree', version: manifest.version, platforms: { ...previous.platforms, [`${platform}-${process.arch}`]: release } }
+  const trusted = { ...previous, appId: 'com.asun-labs.ez-tree', version: manifest.version, platforms: { ...previous.platforms, [`${platform}-${process.arch}`]: release } }
   await mkdir(resolve(root, 'releases'), { recursive: true })
   await writeFile(trustedPath, JSON.stringify(trusted, null, 2) + '\n')
   await writeFile(archive + '.sha256', `${release.sha256}  ${filename}\n`)

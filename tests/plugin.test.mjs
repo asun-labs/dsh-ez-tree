@@ -1,12 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHost, apply } from '../plugin/index.mjs'
-import { build } from 'esbuild'
-import { createRequire } from 'node:module'
-import { fileURLToPath, pathToFileURL } from 'node:url'
-import React, { act } from 'react'
-import { createRoot } from 'react-dom/client'
-import { JSDOM } from 'jsdom'
 import { Readable } from 'node:stream'
 import { VERSION } from '../version.mjs'
 
@@ -189,9 +183,11 @@ test('host registers an authenticated owner-checked RPC route and disposable opt
   let registered
   const disposers = []
   let injection
+  const services = { tools: { register: () => () => {} }, skills: { registerProvider: () => () => {}, list: async () => [] },
+    workingDirectory: { ensure: async () => '/workspace' } }
   const ctx = { connection: { admit: () => ({ peer: { principal: { kind: 'remote' } } }) },
     webServer: { register: route => { registered = route; return () => {} } },
-    get: () => undefined, inject: (keys, callback) => { injection = { keys, callback } },
+    get: key => services[key], inject: (keys, callback) => { injection = { keys, callback } },
     effect: setup => { disposers.push(setup()) } }
   apply(ctx)
   assert.equal(registered.path, '/dsh-ez-tree')
@@ -206,109 +202,4 @@ test('host registers an authenticated owner-checked RPC route and disposable opt
   await registered.handler(request, response)
   assert.equal(response.status, 403)
   for (const dispose of disposers.reverse()) await dispose?.()
-})
-
-test('client switches between native and Seal navigation without duplicate main registrations', async () => {
-  const { outputFiles } = await build({ entryPoints: [fileURLToPath(new URL('../plugin/client.jsx', import.meta.url))], bundle: true,
-    platform: 'node', format: 'esm', write: false, logLevel: 'silent' })
-  const client = await import(`data:text/javascript;base64,${Buffer.from(outputFiles[0].contents).toString('base64')}`)
-  const previousDocument = globalThis.document
-  const styles = []
-  globalThis.document = { createElement: () => ({ dataset: {}, remove() { styles.splice(styles.indexOf(this), 1) } }), head: { append: value => styles.push(value) } }
-  const active = new Set()
-  const disposers = []
-  let injectNavigation
-  const effect = setup => { const release = setup(); if (release) disposers.push(release) }
-  const ctx = { effect, connection: { rpc: { call() {} } },
-    slots: { inject: (_slot, callback) => callback(), register: options => {
-      const key = `${options.name}:${options.key ?? options.id}`
-      assert.equal(active.has(key), false, `duplicate slot ${key}`)
-      active.add(key)
-      return () => active.delete(key)
-    } }, inject: (_keys, callback) => { injectNavigation = callback } }
-  try {
-    client.apply(ctx)
-    assert.equal(active.has('main:dsh-ez-tree'), true)
-    let releaseSeal
-    injectNavigation({ effect: setup => { releaseSeal = setup() }, sealHarnessNavigation: { register: value => {
-      assert.equal(active.has('main:dsh-ez-tree'), false)
-      assert.equal(value.id, 'dsh-ez-tree')
-      active.add('seal-navigation')
-      return () => active.delete('seal-navigation')
-    } } })
-    assert.deepEqual([...active], ['seal-navigation'])
-    releaseSeal()
-    assert.equal(active.has('main:dsh-ez-tree'), true)
-    disposers.reverse().forEach(dispose => dispose())
-    assert.equal(active.size, 0)
-    assert.equal(styles.length, 0)
-  } finally { globalThis.document = previousDocument }
-})
-
-test('mounted client clears old-account MCP configuration and never overlaps slow status polls', async () => {
-  const require = createRequire(import.meta.url)
-  const { outputFiles } = await build({ entryPoints: [fileURLToPath(new URL('../plugin/client.jsx', import.meta.url))], bundle: true,
-    platform: 'node', format: 'esm', write: false, logLevel: 'silent', plugins: [{ name: 'shared-react', setup(builder) {
-      builder.onResolve({ filter: /^react$/ }, () => ({ path: pathToFileURL(require.resolve('react')).href, external: true }))
-    } }] })
-  const { EzTreePanel } = await import(`data:text/javascript;base64,${Buffer.from(outputFiles[0].contents).toString('base64')}`)
-  const dom = new JSDOM('<!doctype html><div id="root"></div>')
-  const previous = { document: globalThis.document, window: globalThis.window, setInterval: globalThis.setInterval,
-    clearInterval: globalThis.clearInterval, act: globalThis.IS_REACT_ACT_ENVIRONMENT }
-  globalThis.document = dom.window.document
-  globalThis.window = dom.window
-  globalThis.IS_REACT_ACT_ENVIRONMENT = true
-  let tick
-  globalThis.setInterval = callback => { tick = callback; return 1 }
-  globalThis.clearInterval = () => {}
-  let scope = 'account-a'
-  let loggedOut = false
-  let delayStatus = false
-  let releaseStatus
-  let statusCalls = 0
-  const status = () => ({ accountScope: scope, installed: true, running: false, supported: true, available: true, version: '0.1.0', targetVersion: VERSION, updateAvailable: true })
-  const api = async action => {
-    if (action === 'prepareMcp') return { accountScope: scope, config: { command: '/app/ez-tree.exe', args: ['--account', scope] }, message: 'MCP prepared' }
-    assert.equal(action, 'status')
-    statusCalls++
-    if (loggedOut) throw new Error('请先登录 Seal 账号。')
-    if (delayStatus) return new Promise(resolve => { releaseStatus = resolve })
-    return status()
-  }
-  const container = dom.window.document.getElementById('root')
-  const root = createRoot(container)
-  try {
-    await act(async () => { root.render(React.createElement(EzTreePanel, { api })) })
-    const upgrade = [...container.querySelectorAll('button')].find(button => button.textContent === `升级到 ${VERSION}`)
-    assert.ok(upgrade, 'verified old installation must expose its available upgrade')
-    assert.equal(upgrade.disabled, false)
-    assert.match(container.textContent, /已安装 0\.1\.0/)
-    assert.equal(container.textContent.includes('尚未安装'), false)
-    const prepare = [...container.querySelectorAll('button')].find(button => button.textContent === '准备 MCP')
-    await act(async () => { prepare.click() })
-    assert.match(container.querySelector('pre').textContent, /account-a/)
-    scope = 'account-b'
-    await act(async () => { await tick() })
-    assert.equal(container.querySelector('pre'), null)
-    assert.equal(container.textContent.includes('MCP prepared'), false)
-    const before = statusCalls
-    delayStatus = true
-    let pending
-    await act(async () => { pending = tick(); await tick() })
-    assert.equal(statusCalls, before + 1)
-    await act(async () => { releaseStatus(status()); await pending })
-    delayStatus = false
-    await act(async () => { prepare.click() })
-    assert.match(container.querySelector('pre').textContent, /account-b/)
-    loggedOut = true
-    await act(async () => { await tick() })
-    assert.equal(container.querySelector('pre'), null)
-    assert.match(container.querySelector('[role="alert"]').textContent, /请先登录/)
-  } finally {
-    await act(async () => { root.unmount() })
-    dom.window.close()
-    globalThis.document = previous.document; globalThis.window = previous.window
-    globalThis.setInterval = previous.setInterval; globalThis.clearInterval = previous.clearInterval
-    globalThis.IS_REACT_ACT_ENVIRONMENT = previous.act
-  }
 })

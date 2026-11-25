@@ -14,7 +14,7 @@ const here = dirname(fileURLToPath(import.meta.url))
 export const packageRoot = resolve(here, existsSync(join(here, '../package.json')) ? '..' : '../..')
 const processes = new Map()
 const installations = new Map()
-const LEGACY_VERSIONS = ['0.1.0']
+const LEGACY_VERSIONS = ['0.1.1', '0.1.0']
 
 export class RuntimeManager {
   constructor({ home = process.env.DSH_HOME || join(homedir(), '.seal-harness'), accountId, signal, onLog = () => {}, manifest, legacyManifests, fetchImpl = fetch, renameImpl = rename, spawnImpl = spawn } = {}) {
