@@ -4,6 +4,8 @@
 
 <h1 align="center">EZ-Tree</h1>
 
+<p align="center"><strong>简体中文</strong> · <a href="README.en.md">English</a></p>
+
 <p align="center">
   <strong>在当前会话里，让一棵树长出来。</strong><br>
   真实三维编辑器 · 会话共享项目 · GLB / PNG / JSON 导出
